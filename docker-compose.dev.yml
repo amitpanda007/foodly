@@ -1,0 +1,48 @@
+version: '3.8'
+
+# Development-only compose file
+# Use: docker-compose -f docker-compose.dev.yml up -d
+
+services:
+  # PostgreSQL Database (development)
+  postgres:
+    image: postgres:16-alpine
+    container_name: foodly-postgres-dev
+    environment:
+      POSTGRES_USER: foodly
+      POSTGRES_PASSWORD: foodly_password
+      POSTGRES_DB: foodly_db
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U foodly -d foodly_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - foodly-dev-network
+
+  # Ollama LLM Service (development - CPU mode)
+  ollama:
+    image: ollama/ollama:latest
+    container_name: foodly-ollama-dev
+    volumes:
+      - ollama_dev_data:/root/.ollama
+    ports:
+      - "11434:11434"
+    networks:
+      - foodly-dev-network
+    restart: unless-stopped
+    # Note: For GPU support, add: docker-compose -f docker-compose.dev.yml -f docker-compose.gpu.yml up -d
+    # Or run Ollama natively on the host machine for better performance
+
+volumes:
+  postgres_dev_data:
+  ollama_dev_data:
+
+networks:
+  foodly-dev-network:
+    driver: bridge
+

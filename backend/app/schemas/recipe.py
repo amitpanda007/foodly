@@ -1,0 +1,74 @@
+from pydantic import BaseModel, HttpUrl
+from typing import Optional, List
+from datetime import datetime
+
+
+class IngredientSchema(BaseModel):
+    name: str
+    amount: Optional[str] = None
+    unit: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class StepSchema(BaseModel):
+    number: int
+    instruction: str
+    duration: Optional[str] = None
+    tips: Optional[str] = None
+    audio_url: Optional[str] = None
+
+
+class RecipeProcessRequest(BaseModel):
+    url: str
+    user_id: Optional[str] = None
+
+
+class RecipeCreate(BaseModel):
+    title: str
+    source_url: str
+    source_type: str
+    description: Optional[str] = None
+    image_url: Optional[str] = None
+    prep_time: Optional[str] = None
+    cook_time: Optional[str] = None
+    total_time: Optional[str] = None
+    servings: Optional[str] = None
+    ingredients: List[IngredientSchema]
+    steps: List[StepSchema]
+    tags: Optional[List[str]] = []
+    raw_content: Optional[str] = None
+    intro_text: Optional[str] = None
+    outro_text: Optional[str] = None
+    intro_audio_url: Optional[str] = None
+    outro_audio_url: Optional[str] = None
+
+
+class RecipeResponse(BaseModel):
+    id: int
+    title: str
+    source_url: str
+    source_type: str
+    description: Optional[str] = None
+    image_url: Optional[str] = None
+    prep_time: Optional[str] = None
+    cook_time: Optional[str] = None
+    total_time: Optional[str] = None
+    servings: Optional[str] = None
+    ingredients: List[IngredientSchema]
+    steps: List[StepSchema]
+    tags: Optional[List[str]] = []
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    intro_text: Optional[str] = None
+    outro_text: Optional[str] = None
+    intro_audio_url: Optional[str] = None
+    outro_audio_url: Optional[str] = None
+    
+    class Config:
+        from_attributes = True
+
+
+class RecipeListResponse(BaseModel):
+    recipes: List[RecipeResponse]
+    total: int
+

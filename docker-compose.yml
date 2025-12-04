@@ -1,0 +1,86 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: foodly-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-foodly}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-foodly_password}
+      POSTGRES_DB: ${POSTGRES_DB:-foodly_db}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-foodly} -d ${POSTGRES_DB:-foodly_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - foodly-network
+
+  # Ollama LLM Service (CPU mode - for GPU, see docker-compose.gpu.yml)
+  ollama:
+    image: ollama/ollama:latest
+    container_name: foodly-ollama
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "11434:11434"
+    networks:
+      - foodly-network
+    restart: unless-stopped
+    # Pull the model on startup
+    entrypoint: ["/bin/sh", "-c", "ollama serve & sleep 10 && ollama pull ${OLLAMA_MODEL:-llama3.2:3b} && wait"]
+
+  # FastAPI Backend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: foodly-backend
+    env_file:
+      - ./.env
+    volumes:
+      - foodly_static:/app/app/static
+    ports:
+      - "8001:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+    networks:
+      - foodly-network
+    restart: unless-stopped
+
+  # React Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8001}
+    container_name: foodly-frontend
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./frontend/certs:/etc/nginx/certs:ro
+    depends_on:
+      - backend
+    networks:
+      - foodly-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  ollama_data:
+  foodly_static:
+
+networks:
+  foodly-network:
+    driver: bridge
+
