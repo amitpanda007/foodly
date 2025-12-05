@@ -23,9 +23,14 @@ interface StepNavigatorProps {
 }
 
 export function StepNavigator({ steps }: StepNavigatorProps) {
+  const AUTO_PLAY_KEY = 'foodly:autoPlay';
+
   const [currentStep, setCurrentStep] = useState(0);
   const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
-  const [autoAdvance, setAutoAdvance] = useState(false);
+  const [autoAdvance, setAutoAdvance] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem(AUTO_PLAY_KEY) === 'true';
+  });
   const [isPlaying, setIsPlaying] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -95,6 +100,18 @@ export function StepNavigator({ steps }: StepNavigatorProps) {
       phrases: ['play', 'start', 'go', 'begin'], 
       action: () => { setLastHeardCommand('play'); setIsPlaying(true); } 
     },
+    { 
+      phrases: ['auto play', 'autoplay', 'toggle auto play', 'toggle autoplay'], 
+      action: () => { setLastHeardCommand('auto play toggle'); setAutoAdvance((prev) => !prev); } 
+    },
+    { 
+      phrases: ['turn on auto play', 'enable auto play', 'turn on autoplay', 'enable autoplay'], 
+      action: () => { setLastHeardCommand('auto play on'); setAutoAdvance(true); setIsPlaying(true); } 
+    },
+    { 
+      phrases: ['turn off auto play', 'disable auto play', 'turn off autoplay', 'disable autoplay'], 
+      action: () => { setLastHeardCommand('auto play off'); setAutoAdvance(false); } 
+    },
   ], [goToNext, goToPrev, readCurrentStep, stopSpeaking]);
 
   const {
@@ -103,6 +120,12 @@ export function StepNavigator({ steps }: StepNavigatorProps) {
     toggleListening,
     transcript
   } = useSpeechRecognition(voiceCommands);
+
+  // Persist auto-play preference
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem(AUTO_PLAY_KEY, autoAdvance ? 'true' : 'false');
+  }, [autoAdvance]);
 
   // Handle Auto-Play Sequence
   useEffect(() => {

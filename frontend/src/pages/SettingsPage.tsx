@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { CheckCircle2, ListChecks, ChevronDown, ChevronUp } from 'lucide-react';
+import { CheckCircle2, ListChecks, ChevronDown, ChevronUp, LogOut, User, Shield, Mail, RefreshCw } from 'lucide-react';
 import { api } from '../services/api';
 import { VoiceOption } from '../types';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { SEO } from '../components/SEO';
+import { useAuth } from '../hooks/useAuth';
+import { AuthModal } from '../components/AuthModal';
+import { useLoginPrompt } from '../components/LoginPrompt';
 
 const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '');
 
@@ -17,9 +20,12 @@ const HOTKEYS = [
   { action: 'Repeat step', phrases: ['repeat', 'again', 'say again', 'read'] },
   { action: 'Pause / Stop', phrases: ['stop', 'pause', 'quiet', 'hush'] },
   { action: 'Play / Resume', phrases: ['play', 'start', 'go', 'begin'] },
+  { action: 'Toggle auto-play', phrases: ['auto play', 'autoplay', 'toggle auto play', 'turn on auto play', 'turn off auto play'] },
 ];
 
 export function SettingsPage({ userId }: SettingsPageProps) {
+  const { isAuthenticated, user, logout, anonymousUserId } = useAuth();
+  const { shouldShow: loginPromptEnabled, resetPrompt: resetLoginPrompt } = useLoginPrompt();
   const [voices, setVoices] = useState<VoiceOption[]>([]);
   const [currentVoice, setCurrentVoice] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -29,6 +35,7 @@ export function SettingsPage({ userId }: SettingsPageProps) {
   const [previewingVoiceId, setPreviewingVoiceId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [showHotwords, setShowHotwords] = useState(true);
+  const [showAuthModal, setShowAuthModal] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -137,6 +144,97 @@ export function SettingsPage({ userId }: SettingsPageProps) {
         <p className="text-charcoal-500 dark:text-charcoal-300">
           Configure app preferences and voice options for your cooking sessions.
         </p>
+      </div>
+
+      {/* Account Section */}
+      <div className="bg-white dark:bg-charcoal-900 border border-cream-200 dark:border-charcoal-800 rounded-2xl shadow-sm overflow-hidden">
+        <div className="px-5 py-4 border-b border-cream-200 dark:border-charcoal-800">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-600">
+              <User className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-charcoal-900 dark:text-white">Account</h2>
+              <p className="text-sm text-charcoal-500 dark:text-charcoal-400">
+                {isAuthenticated ? 'Manage your account' : 'Sign in to sync your recipes'}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-5">
+          {isAuthenticated ? (
+            <div className="space-y-4">
+              {/* User info */}
+              <div className="flex items-center gap-4 p-4 rounded-xl bg-cream-50 dark:bg-charcoal-800/50">
+                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white font-bold text-lg">
+                  {user?.email.charAt(0).toUpperCase()}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <Mail className="w-4 h-4 text-charcoal-400" />
+                    <p className="text-charcoal-900 dark:text-white font-medium truncate">
+                      {user?.email}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Shield className="w-4 h-4 text-emerald-500" />
+                    <p className="text-sm text-emerald-600 dark:text-emerald-400">
+                      Recipes synced across devices
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Logout button */}
+              <button
+                onClick={logout}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors font-medium"
+              >
+                <LogOut className="w-5 h-5" />
+                Sign out
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+                <p className="text-sm text-amber-800 dark:text-amber-200">
+                  You're using Foodly as a guest. Your recipes are stored locally on this device. 
+                  Sign in to sync them across all your devices and keep them safe!
+                </p>
+              </div>
+
+              <button
+                onClick={() => setShowAuthModal(true)}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3.5 rounded-xl font-bold text-white bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 shadow-lg shadow-emerald-500/20 transition-all"
+              >
+                Sign in or Create Account
+              </button>
+
+              {/* Device info for non-authenticated users */}
+              <div className="mt-4 p-4 rounded-xl bg-gray-50 dark:bg-charcoal-800/30 border border-gray-200 dark:border-charcoal-800">
+                <p className="text-xs text-charcoal-500 dark:text-charcoal-400 mb-1">Device ID</p>
+                <p className="text-sm font-mono text-charcoal-700 dark:text-charcoal-300 truncate">
+                  {anonymousUserId}
+                </p>
+              </div>
+
+              {/* Reset login prompt */}
+              {!loginPromptEnabled && (
+                <button
+                  onClick={() => {
+                    resetLoginPrompt();
+                    setSuccess('Login prompt will show again');
+                  }}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-charcoal-600 dark:text-charcoal-400 bg-gray-100 dark:bg-charcoal-800 hover:bg-gray-200 dark:hover:bg-charcoal-700 transition-colors"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  Reset login reminder
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Hotwords Card */}
@@ -261,8 +359,13 @@ export function SettingsPage({ userId }: SettingsPageProps) {
           )}
         </>
       )}
+
+      {/* Auth Modal */}
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        initialMode="login"
+      />
     </div>
   );
 }
-
-

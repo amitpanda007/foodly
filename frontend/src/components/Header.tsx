@@ -1,13 +1,17 @@
-import { Sun, Moon, ChefHat } from 'lucide-react';
+import { Sun, Moon, ChefHat, LogIn, LogOut, User } from 'lucide-react';
+import { useAuth } from '../hooks/useAuth';
 
 interface HeaderProps {
   theme: 'light' | 'dark';
   onToggleTheme: () => void;
   onNavigate: (page: 'home' | 'recipes' | 'settings') => void;
   currentPage: 'home' | 'recipes' | 'cook' | 'settings';
+  onOpenAuth: () => void;
 }
 
-export function Header({ theme, onToggleTheme, onNavigate, currentPage }: HeaderProps) {
+export function Header({ theme, onToggleTheme, onNavigate, currentPage, onOpenAuth }: HeaderProps) {
+  const { isAuthenticated, user, logout } = useAuth();
+
   return (
     <header className="sticky top-0 z-50 backdrop-blur-xl bg-white/80 dark:bg-gray-950/80 border-b border-gray-200 dark:border-gray-800 safe-top transition-all duration-300">
       <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
@@ -57,20 +61,49 @@ export function Header({ theme, onToggleTheme, onNavigate, currentPage }: Header
           </button>
         </nav>
 
-        <button
-          onClick={onToggleTheme}
-          className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-all focus:outline-none focus:ring-2 focus:ring-emerald-400 hover:rotate-12"
-          aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
-        >
-          {theme === 'light' ? (
-            <Moon className="w-5 h-5" />
+        {/* Right side actions */}
+        <div className="flex items-center gap-2">
+          {/* Auth button */}
+          {isAuthenticated ? (
+            <div className="hidden md:flex items-center gap-2">
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300">
+                <User className="w-4 h-4" />
+                <span className="text-sm font-medium max-w-[120px] truncate">
+                  {user?.email.split('@')[0]}
+                </span>
+              </div>
+              <button
+                onClick={logout}
+                className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 transition-all"
+              >
+                <LogOut className="w-4 h-4" />
+                <span className="hidden lg:inline">Sign out</span>
+              </button>
+            </div>
           ) : (
-            <Sun className="w-5 h-5" />
+            <button
+              onClick={onOpenAuth}
+              className="hidden md:flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold text-white bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 shadow-md shadow-emerald-500/20 hover:shadow-lg transition-all"
+            >
+              <LogIn className="w-4 h-4" />
+              Sign in
+            </button>
           )}
-        </button>
+
+          {/* Theme toggle */}
+          <button
+            onClick={onToggleTheme}
+            className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-all focus:outline-none focus:ring-2 focus:ring-emerald-400 hover:rotate-12"
+            aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
+          >
+            {theme === 'light' ? (
+              <Moon className="w-5 h-5" />
+            ) : (
+              <Sun className="w-5 h-5" />
+            )}
+          </button>
+        </div>
       </div>
     </header>
   );
 }
-
-

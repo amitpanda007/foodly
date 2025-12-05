@@ -20,7 +20,8 @@ class StepSchema(BaseModel):
 
 class RecipeProcessRequest(BaseModel):
     url: str
-    user_id: Optional[str] = None
+    user_id: Optional[int] = None  # Authenticated user ID
+    anonymous_user_id: Optional[str] = None  # Anonymous user ID from localStorage
 
 
 class RecipeCreate(BaseModel):
@@ -41,6 +42,8 @@ class RecipeCreate(BaseModel):
     outro_text: Optional[str] = None
     intro_audio_url: Optional[str] = None
     outro_audio_url: Optional[str] = None
+    user_id: Optional[int] = None  # Authenticated user ID
+    anonymous_user_id: Optional[str] = None  # Anonymous user ID
 
 
 class RecipeResponse(BaseModel):
@@ -63,9 +66,17 @@ class RecipeResponse(BaseModel):
     outro_text: Optional[str] = None
     intro_audio_url: Optional[str] = None
     outro_audio_url: Optional[str] = None
+    user_id: Optional[int] = None
+    anonymous_user_id: Optional[str] = None
+    is_public: bool = False
     
     class Config:
         from_attributes = True
+
+
+class RecipeSaveRequest(BaseModel):
+    """Request to save a shared recipe to user's profile"""
+    recipe_id: int
 
 
 class RecipeListResponse(BaseModel):

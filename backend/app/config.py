@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     # Database
     database_url: str = "postgresql+asyncpg://foodly:foodly_password@localhost:5432/foodly_db"
     
+    # JWT Authentication
+    jwt_secret_key: str = "foodly-secret-change-me-in-production-use-long-random-string"
+    
     # Ollama
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "llama3.2:3b"

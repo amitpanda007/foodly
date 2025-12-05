@@ -12,6 +12,7 @@ import { Recipe, Step } from '../types';
 import { StepNavigator } from './StepNavigator';
 import { IngredientsList } from './IngredientsList';
 import { SEO } from './SEO';
+import { SaveRecipeButton } from './SaveRecipeButton';
 
 interface CookingViewProps {
   recipe: Recipe;
@@ -139,55 +140,101 @@ export function CookingView({ recipe, onBack }: CookingViewProps) {
       </header>
 
       {/* Main Content */}
-      <main className="pb-28 lg:pb-28">
-        {/* Recipe Hero - Compact on mobile */}
-        <div className="bg-white dark:bg-charcoal-900 border-b border-cream-200 dark:border-charcoal-800">
-          {recipe.image_url && (
-            <div className="relative h-40 sm:h-52 lg:h-64">
-              <img
-                src={recipe.image_url}
-                alt={recipe.title}
-                className="w-full h-full object-cover"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = 'none';
-                }}
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+      <main className="pb-28 lg:pb-12">
+        <div className="max-w-6xl mx-auto px-4 lg:px-6">
+          <div className="rounded-3xl bg-white dark:bg-charcoal-900 border border-cream-200 dark:border-charcoal-800 shadow-xl overflow-hidden">
+            {/* Recipe Hero - Compact on mobile */}
+            <div className="border-b border-cream-200 dark:border-charcoal-800">
+              {recipe.image_url && (
+                <div className="relative h-40 sm:h-52 lg:h-64">
+                  <img
+                    src={recipe.image_url}
+                    alt={recipe.title}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                </div>
+              )}
+              
+              {/* Recipe Meta */}
+              <div className="px-4 py-4 lg:px-6 lg:py-5">
+                <h2 className="text-xl sm:text-2xl font-bold text-charcoal-900 dark:text-white mb-3 leading-tight">
+                  {recipe.title}
+                </h2>
+                
+                {/* Stats Row */}
+                <div className="flex flex-wrap items-center gap-3 text-sm">
+                  {recipe.total_time && (
+                    <div className="flex items-center gap-1.5 text-charcoal-600 dark:text-charcoal-400">
+                      <Clock className="w-4 h-4 text-sage-600" />
+                      <span>{recipe.total_time}</span>
+                    </div>
+                  )}
+                  {recipe.servings && (
+                    <div className="flex items-center gap-1.5 text-charcoal-600 dark:text-charcoal-400">
+                      <Users className="w-4 h-4 text-sage-600" />
+                      <span>{recipe.servings}</span>
+                    </div>
+                  )}
+                  
+                  {/* Save button for shared recipes */}
+                  <SaveRecipeButton recipe={recipe} className="ml-auto" />
+                </div>
+              </div>
             </div>
-          )}
-          
-          {/* Recipe Meta */}
-          <div className="px-4 py-4">
-            <h2 className="text-xl sm:text-2xl font-bold text-charcoal-900 dark:text-white mb-3 leading-tight">
-              {recipe.title}
-            </h2>
-            
-            {/* Stats Row */}
-            <div className="flex flex-wrap gap-3 text-sm">
-              {recipe.total_time && (
-                <div className="flex items-center gap-1.5 text-charcoal-600 dark:text-charcoal-400">
-                  <Clock className="w-4 h-4 text-sage-600" />
-                  <span>{recipe.total_time}</span>
+
+            {/* Steps Area - mobile/tablet single column */}
+            <div className="lg:hidden px-4 py-6">
+              <StepNavigator steps={augmentedSteps} />
+            </div>
+
+            {/* Desktop layout: steps + ingredients side-by-side */}
+            <div className="hidden lg:grid px-6 py-8 grid-cols-3 gap-6">
+              <div className="col-span-2">
+                <div className="rounded-2xl bg-white/90 dark:bg-charcoal-900/90 border border-cream-200 dark:border-charcoal-800 shadow-lg shadow-emerald-500/5">
+                  <StepNavigator steps={augmentedSteps} />
                 </div>
-              )}
-              {recipe.servings && (
-                <div className="flex items-center gap-1.5 text-charcoal-600 dark:text-charcoal-400">
-                  <Users className="w-4 h-4 text-sage-600" />
-                  <span>{recipe.servings}</span>
+              </div>
+              <div className="col-span-1">
+                <div className="sticky top-24 space-y-4">
+                  <div className="rounded-2xl bg-white dark:bg-charcoal-900 border border-cream-200 dark:border-charcoal-800 shadow-md p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">🥗</span>
+                        <div>
+                          <p className="text-sm font-semibold text-charcoal-900 dark:text-white">Ingredients</p>
+                          <p className="text-xs text-charcoal-500 dark:text-charcoal-400">
+                            {checkedIngredients.size} of {recipe.ingredients.length} ready
+                          </p>
+                        </div>
+                      </div>
+                      <div className="w-20 h-2 bg-cream-200 dark:bg-charcoal-800 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-sage-500 transition-all duration-300"
+                          style={{ width: `${ingredientProgress}%` }}
+                        />
+                      </div>
+                    </div>
+                    <div className="max-h-[60vh] overflow-y-auto pr-1">
+                      <IngredientsList
+                        ingredients={recipe.ingredients}
+                        checkedItems={checkedIngredients}
+                        onToggleItem={toggleIngredient}
+                      />
+                    </div>
+                  </div>
                 </div>
-              )}
+              </div>
             </div>
           </div>
         </div>
-
-        {/* Steps Area */}
-        <div className="max-w-5xl mx-auto px-4 py-6">
-          <StepNavigator steps={augmentedSteps} />
-        </div>
       </main>
 
-      {/* Bottom Ingredients Toggle - minimized by default */}
-      <div className="fixed bottom-16 md:bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-charcoal-900/95 backdrop-blur border-t border-cream-200 dark:border-charcoal-800 shadow-lg transition-all duration-300">
+      {/* Bottom Ingredients Toggle - minimized by default (mobile/tablet only) */}
+      <div className="fixed bottom-16 md:bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-charcoal-900/95 backdrop-blur border-t border-cream-200 dark:border-charcoal-800 shadow-lg transition-all duration-300 lg:hidden">
         <button
           onClick={() => setShowIngredients((v) => !v)}
           className="w-full flex items-center justify-between px-4 py-3"

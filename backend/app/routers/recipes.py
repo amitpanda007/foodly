@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Header
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 from app.database import get_db
@@ -7,6 +7,7 @@ from app.schemas.recipe import (
     RecipeResponse,
     RecipeListResponse,
     RecipeProcessRequest,
+    RecipeSaveRequest,
     IngredientSchema,
     StepSchema
 )
@@ -14,8 +15,29 @@ from app.services.recipe_service import RecipeService
 from app.services.scraper_service import ScraperService, get_scraper_service
 from app.services.llm_service import LLMService, get_llm_service
 from app.services.user_settings_service import UserSettingsService
+from app.services.auth_service import AuthService
+from app.models.user import User
 
 router = APIRouter(prefix="/api/recipes", tags=["recipes"])
+
+
+async def get_optional_user(
+    authorization: Optional[str] = Header(None),
+    db: AsyncSession = Depends(get_db)
+) -> Optional[User]:
+    """Extract user from Authorization header if present"""
+    if not authorization:
+        return None
+    
+    try:
+        scheme, token = authorization.split()
+        if scheme.lower() != "bearer":
+            return None
+    except ValueError:
+        return None
+    
+    auth_service = AuthService(db)
+    return await auth_service.verify_token(token)
 
 
 @router.post("/process", response_model=RecipeResponse)
@@ -23,15 +45,27 @@ async def process_recipe(
     request: RecipeProcessRequest,
     db: AsyncSession = Depends(get_db),
     scraper: ScraperService = Depends(get_scraper_service),
-    llm: LLMService = Depends(get_llm_service)
+    llm: LLMService = Depends(get_llm_service),
+    user: Optional[User] = Depends(get_optional_user)
 ):
     """Process a recipe URL (website or YouTube) and save it."""
     recipe_service = RecipeService(db)
     user_settings = UserSettingsService(db)
-    voice_id = await user_settings.get_user_voice(request.user_id)
     
-    # Check if recipe already exists
-    existing = await recipe_service.get_recipe_by_url(request.url)
+    # Determine user info
+    user_id = user.id if user else request.user_id
+    anonymous_user_id = request.anonymous_user_id if not user else None
+    
+    # Get voice preference
+    voice_user_id = str(user_id) if user_id else request.anonymous_user_id
+    voice_id = await user_settings.get_user_voice(voice_user_id) if voice_user_id else None
+    
+    # Check if recipe already exists for this user
+    existing = await recipe_service.get_recipe_by_url(
+        request.url,
+        user_id=user_id,
+        anonymous_user_id=anonymous_user_id
+    )
     if existing:
         return existing
     
@@ -105,7 +139,11 @@ async def process_recipe(
             outro_audio_url=parsed_recipe.get("outro_audio_url")
         )
         
-        recipe = await recipe_service.create_recipe(recipe_data)
+        recipe = await recipe_service.create_recipe(
+            recipe_data,
+            user_id=user_id,
+            anonymous_user_id=anonymous_user_id
+        )
         return recipe
         
     except Exception as e:
@@ -116,12 +154,26 @@ async def process_recipe(
 async def get_recipes(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
-    db: AsyncSession = Depends(get_db)
+    anonymous_user_id: Optional[str] = Query(None, description="Anonymous user ID from localStorage"),
+    db: AsyncSession = Depends(get_db),
+    user: Optional[User] = Depends(get_optional_user)
 ):
-    """Get all saved recipes."""
+    """Get recipes for the current user."""
     recipe_service = RecipeService(db)
-    recipes = await recipe_service.get_all_recipes(skip=skip, limit=limit)
-    total = await recipe_service.count_recipes()
+    
+    # Get user-specific recipes
+    user_id = user.id if user else None
+    
+    recipes = await recipe_service.get_user_recipes(
+        user_id=user_id,
+        anonymous_user_id=anonymous_user_id if not user else None,
+        skip=skip,
+        limit=limit
+    )
+    total = await recipe_service.count_user_recipes(
+        user_id=user_id,
+        anonymous_user_id=anonymous_user_id if not user else None
+    )
     return RecipeListResponse(recipes=recipes, total=total)
 
 
@@ -130,11 +182,22 @@ async def search_recipes(
     q: str = Query(..., min_length=1),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
-    db: AsyncSession = Depends(get_db)
+    anonymous_user_id: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    user: Optional[User] = Depends(get_optional_user)
 ):
-    """Search recipes by title or description."""
+    """Search recipes by title or description for the current user."""
     recipe_service = RecipeService(db)
-    recipes = await recipe_service.search_recipes(q, skip=skip, limit=limit)
+    
+    user_id = user.id if user else None
+    
+    recipes = await recipe_service.search_user_recipes(
+        q,
+        user_id=user_id,
+        anonymous_user_id=anonymous_user_id if not user else None,
+        skip=skip,
+        limit=limit
+    )
     return RecipeListResponse(recipes=recipes, total=len(recipes))
 
 
@@ -154,12 +217,92 @@ async def get_recipe(
 @router.delete("/{recipe_id}")
 async def delete_recipe(
     recipe_id: int,
-    db: AsyncSession = Depends(get_db)
+    anonymous_user_id: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    user: Optional[User] = Depends(get_optional_user)
 ):
     """Delete a recipe."""
     recipe_service = RecipeService(db)
-    success = await recipe_service.delete_recipe(recipe_id)
+    
+    user_id = user.id if user else None
+
+    # Require identity to delete recipes
+    if not user_id and not anonymous_user_id:
+        raise HTTPException(
+            status_code=401,
+            detail="Authentication or anonymous user id required to delete recipe"
+        )
+
+    success = await recipe_service.delete_recipe(
+        recipe_id,
+        user_id=user_id,
+        anonymous_user_id=anonymous_user_id if not user else None
+    )
     if not success:
-        raise HTTPException(status_code=404, detail="Recipe not found")
+        raise HTTPException(status_code=404, detail="Recipe not found or not owned by user")
     return {"message": "Recipe deleted successfully"}
 
+
+@router.post("/save", response_model=RecipeResponse)
+async def save_shared_recipe(
+    request: RecipeSaveRequest,
+    anonymous_user_id: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    user: Optional[User] = Depends(get_optional_user)
+):
+    """Save a shared recipe to user's profile."""
+    recipe_service = RecipeService(db)
+    
+    user_id = user.id if user else None
+    anon_id = anonymous_user_id if not user else None
+    
+    if not user_id and not anon_id:
+        raise HTTPException(
+            status_code=400,
+            detail="User identification required to save recipe"
+        )
+    
+    # Check if recipe exists
+    original = await recipe_service.get_recipe(request.recipe_id)
+    if not original:
+        raise HTTPException(status_code=404, detail="Recipe not found")
+    
+    # Check if user already has this recipe (by URL)
+    existing = await recipe_service.get_recipe_by_url(
+        original.source_url,
+        user_id=user_id,
+        anonymous_user_id=anon_id
+    )
+    if existing:
+        return existing  # Already saved
+    
+    # Copy recipe to user's profile
+    new_recipe = await recipe_service.copy_recipe_to_user(
+        request.recipe_id,
+        user_id=user_id,
+        anonymous_user_id=anon_id
+    )
+    
+    if not new_recipe:
+        raise HTTPException(status_code=500, detail="Failed to save recipe")
+    
+    return new_recipe
+
+
+@router.post("/migrate")
+async def migrate_anonymous_recipes(
+    anonymous_user_id: str = Query(..., description="Anonymous user ID to migrate from"),
+    db: AsyncSession = Depends(get_db),
+    user: Optional[User] = Depends(get_optional_user)
+):
+    """Migrate recipes from anonymous user to authenticated user."""
+    if not user:
+        raise HTTPException(
+            status_code=401,
+            detail="Authentication required to migrate recipes"
+        )
+    
+    recipe_service = RecipeService(db)
+    count = await recipe_service.migrate_anonymous_recipes(anonymous_user_id, user.id)
+    
+    return {"message": f"Successfully migrated {count} recipes", "count": count}

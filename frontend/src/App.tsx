@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useTheme } from './hooks/useTheme';
+import { AuthProvider, useAuth } from './hooks/useAuth';
 import { Header } from './components/Header';
 import { BottomNav } from './components/BottomNav';
 import { HomePage } from './pages/HomePage';
@@ -8,22 +9,63 @@ import { CookingView } from './components/CookingView';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { ErrorMessage } from './components/ErrorMessage';
 import { SettingsPage } from './pages/SettingsPage';
+import { AuthModal } from './components/AuthModal';
+import { LoginPrompt, useLoginPrompt } from './components/LoginPrompt';
 import { api } from './services/api';
 import { Recipe } from './types';
-import { useUserId } from './hooks/useUserId';
 
 type Page = 'home' | 'recipes' | 'cook' | 'settings';
 
-function App() {
+function AppContent() {
   const { theme, toggleTheme } = useTheme();
+  const { isAuthenticated, accessToken, anonymousUserId, user, isLoading: isAuthLoading } = useAuth();
+  const { shouldShow: shouldShowLoginPrompt } = useLoginPrompt();
+  
   const [currentPage, setCurrentPage] = useState<Page>('home');
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isLoadingRecipe, setIsLoadingRecipe] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const userId = useUserId();
+  
+  // Auth modal state
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authModalMode, setAuthModalMode] = useState<'login' | 'signup'>('login');
+  
+  // Login prompt state
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false);
+  const [hasShownPromptThisSession, setHasShownPromptThisSession] = useState(false);
 
-  // Handle deep-linking: check URL for /recipes/:id on mount
+  // Show login prompt after first recipe is processed (for anonymous users)
+  useEffect(() => {
+    // Show prompt when:
+    // 1. User is not authenticated
+    // 2. A recipe has been selected (just processed or viewing)
+    // 3. Haven't shown this session
+    // 4. User hasn't dismissed permanently
+    if (!isAuthenticated && selectedRecipe && !hasShownPromptThisSession && shouldShowLoginPrompt) {
+      const timer = setTimeout(() => {
+        setShowLoginPrompt(true);
+        setHasShownPromptThisSession(true);
+      }, 1500); // Show after 1.5 seconds
+      return () => clearTimeout(timer);
+    }
+  }, [selectedRecipe, isAuthenticated, hasShownPromptThisSession, shouldShowLoginPrompt]);
+
+  // Also show login prompt when visiting recipes page for first time (if has recipes)
+  useEffect(() => {
+    if (!isAuthenticated && currentPage === 'recipes' && !hasShownPromptThisSession && shouldShowLoginPrompt) {
+      const timer = setTimeout(() => {
+        setShowLoginPrompt(true);
+        setHasShownPromptThisSession(true);
+      }, 3000); // Show after 3 seconds on recipes page
+      return () => clearTimeout(timer);
+    }
+  }, [currentPage, isAuthenticated, hasShownPromptThisSession, shouldShowLoginPrompt]);
+
+  // Use user ID or anonymous ID for API calls
+  const userId = isAuthenticated ? String(user?.id) : anonymousUserId;
+
+  // Handle deep-linking: check URL for /recipes/:id or static routes on mount
   useEffect(() => {
     const handleRouting = async () => {
       const path = window.location.pathname;
@@ -44,7 +86,24 @@ function App() {
         } finally {
           setIsLoadingRecipe(false);
         }
+        return;
       }
+
+      // Static route handling
+      if (path === '/recipes') {
+        setCurrentPage('recipes');
+        setSelectedRecipe(null);
+        return;
+      }
+      if (path === '/settings') {
+        setCurrentPage('settings');
+        setSelectedRecipe(null);
+        return;
+      }
+
+      // Default to home
+      setCurrentPage('home');
+      setSelectedRecipe(null);
     };
 
     handleRouting();
@@ -80,7 +139,11 @@ function App() {
     setError(null);
 
     try {
-      const recipe = await api.processRecipe({ url, user_id: userId });
+      const request = isAuthenticated
+        ? { url, user_id: user?.id }
+        : { url, anonymous_user_id: anonymousUserId };
+      
+      const recipe = await api.processRecipe(request, accessToken);
       setSelectedRecipe(recipe);
       setCurrentPage('cook');
     } catch (err) {
@@ -88,7 +151,7 @@ function App() {
     } finally {
       setIsProcessing(false);
     }
-  }, [userId]);
+  }, [isAuthenticated, user, anonymousUserId, accessToken]);
 
   const handleSelectRecipe = useCallback((recipe: Recipe) => {
     setSelectedRecipe(recipe);
@@ -113,12 +176,17 @@ function App() {
     window.history.pushState({}, '', '/recipes');
   }, []);
 
-  // Loading state for deep-linked recipe
-  if (isLoadingRecipe) {
+  const handleOpenAuth = useCallback((mode: 'login' | 'signup' = 'login') => {
+    setAuthModalMode(mode);
+    setShowAuthModal(true);
+  }, []);
+
+  // Loading state for auth or deep-linked recipe
+  if (isAuthLoading || isLoadingRecipe) {
     return (
       <div className={theme}>
         <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50 dark:from-zinc-950 dark:via-zinc-900 dark:to-zinc-950">
-          <LoadingSpinner message="Loading recipe..." />
+          <LoadingSpinner message={isAuthLoading ? "Loading..." : "Loading recipe..."} />
         </div>
       </div>
     );
@@ -132,6 +200,7 @@ function App() {
           onToggleTheme={toggleTheme}
           onNavigate={handleNavigate}
           currentPage={currentPage === 'cook' ? 'recipes' : currentPage}
+          onOpenAuth={() => handleOpenAuth('login')}
         />
 
         <main className="flex-1">
@@ -187,9 +256,33 @@ function App() {
         <BottomNav
           currentPage={currentPage === 'cook' ? 'recipes' : currentPage}
           onNavigate={handleNavigate}
+          onOpenAuth={() => handleOpenAuth('login')}
+        />
+
+        {/* Auth Modal */}
+        <AuthModal
+          isOpen={showAuthModal}
+          onClose={() => setShowAuthModal(false)}
+          initialMode={authModalMode}
+        />
+
+        {/* Login Prompt */}
+        <LoginPrompt
+          isOpen={showLoginPrompt}
+          onClose={() => setShowLoginPrompt(false)}
+          onLogin={() => handleOpenAuth('login')}
+          onSignup={() => handleOpenAuth('signup')}
         />
       </div>
     </div>
+  );
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }
 

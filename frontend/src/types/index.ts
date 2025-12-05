@@ -33,6 +33,9 @@ export interface Recipe {
   outro_text?: string | null;
   intro_audio_url?: string | null;
   outro_audio_url?: string | null;
+  user_id?: number | null;
+  anonymous_user_id?: string | null;
+  is_public?: boolean;
 }
 
 export interface RecipeListResponse {
@@ -42,7 +45,8 @@ export interface RecipeListResponse {
 
 export interface ProcessRecipeRequest {
   url: string;
-  user_id: string;
+  user_id?: number;
+  anonymous_user_id?: string;
 }
 
 export type Theme = 'light' | 'dark';
@@ -68,5 +72,35 @@ export interface VoiceListResponse {
 export interface UserVoiceResponse {
   user_id: string;
   voice_id: string;
+}
+
+// Authentication types
+export interface User {
+  id: number;
+  email: string;
+  is_active: boolean;
+  is_verified: boolean;
+  created_at: string;
+}
+
+export interface AuthTokens {
+  access_token: string;
+  refresh_token: string;
+  token_type: string;
+  user: User;
+}
+
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface SignupRequest {
+  email: string;
+  password: string;
+}
+
+export interface RecipeSaveRequest {
+  recipe_id: number;
 }
 

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, JSON
+from sqlalchemy import Column, Integer, String, Text, DateTime, JSON, ForeignKey, Boolean
 from sqlalchemy.sql import func
 from app.database import Base
 
@@ -7,6 +7,11 @@ class Recipe(Base):
     __tablename__ = "recipes"
     
     id = Column(Integer, primary_key=True, index=True)
+    # User ownership - either authenticated user_id or anonymous_user_id (from localStorage)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    anonymous_user_id = Column(String(255), nullable=True, index=True)  # For non-logged-in users
+    is_public = Column(Boolean, default=False)  # For shared recipes
+    
     title = Column(String(500), nullable=False, index=True)
     source_url = Column(String(2000), nullable=False)
     source_type = Column(String(50), nullable=False)  # "website" or "youtube"
