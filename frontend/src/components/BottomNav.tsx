@@ -17,7 +17,7 @@ export function BottomNav({ currentPage, onNavigate }: BottomNavProps) {
               : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'
           }`}
         >
-          <Home className={`w-6 h-6 ${currentPage === 'home' ? 'fill-current drop-shadow-sm' : ''}`} />
+          <Home className={`w-6 h-6 ${currentPage === 'home' ? 'drop-shadow-sm' : ''}`} />
           <span className="text-[10px] font-bold tracking-wide">Home</span>
         </button>
 
@@ -29,7 +29,7 @@ export function BottomNav({ currentPage, onNavigate }: BottomNavProps) {
               : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'
           }`}
         >
-          <BookOpen className={`w-6 h-6 ${currentPage === 'recipes' ? 'fill-current drop-shadow-sm' : ''}`} />
+          <BookOpen className={`w-6 h-6 ${currentPage === 'recipes' ? 'drop-shadow-sm' : ''}`} />
           <span className="text-[10px] font-bold tracking-wide">My Recipes</span>
         </button>
 
@@ -41,8 +41,8 @@ export function BottomNav({ currentPage, onNavigate }: BottomNavProps) {
               : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'
           }`}
         >
-          <Settings className={`w-6 h-6 ${currentPage === 'settings' ? 'fill-current drop-shadow-sm' : ''}`} />
-          <span className="text-[10px] font-bold tracking-wide">Voice</span>
+          <Settings className={`w-6 h-6 ${currentPage === 'settings' ? 'drop-shadow-sm' : ''}`} />
+          <span className="text-[10px] font-bold tracking-wide">Settings</span>
         </button>
       </nav>
     </div>

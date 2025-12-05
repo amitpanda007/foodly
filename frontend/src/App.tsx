@@ -124,15 +124,6 @@ function App() {
     );
   }
 
-  // Cooking View has its own full-screen layout
-  if (currentPage === 'cook' && selectedRecipe) {
-    return (
-      <div className={theme}>
-        <CookingView recipe={selectedRecipe} onBack={handleBackFromCooking} />
-      </div>
-    );
-  }
-
   return (
     <div className={theme}>
       <div className="min-h-screen flex flex-col pb-16 md:pb-0">
@@ -140,7 +131,7 @@ function App() {
           theme={theme}
           onToggleTheme={toggleTheme}
           onNavigate={handleNavigate}
-          currentPage={currentPage}
+          currentPage={currentPage === 'cook' ? 'recipes' : currentPage}
         />
 
         <main className="flex-1">
@@ -168,6 +159,8 @@ function App() {
             />
           ) : currentPage === 'recipes' ? (
             <RecipesPage onSelectRecipe={handleSelectRecipe} />
+          ) : currentPage === 'cook' && selectedRecipe ? (
+            <CookingView recipe={selectedRecipe} onBack={handleBackFromCooking} />
           ) : (
             <SettingsPage userId={userId} />
           )}

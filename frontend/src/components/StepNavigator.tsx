@@ -29,10 +29,6 @@ export function StepNavigator({ steps }: StepNavigatorProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
-  // Using ref for lastHeardCommand to avoid re-renders if not displayed, 
-  // but keeping state if we want to show it in UI. 
-  // The error was that it was declared but never read. 
-  // We are reading it in the JSX below now.
   const [lastHeardCommand, setLastHeardCommand] = useState<string | null>(null);
   
   const {
@@ -63,7 +59,8 @@ export function StepNavigator({ steps }: StepNavigatorProps) {
   const readCurrentStep = useCallback((onComplete?: () => void) => {
     const step = steps[currentStep];
     if (step) {
-      let text = `Step ${step.number}. ${step.instruction}`;
+      const displayNumber = currentStep + 1;
+      let text = `Step ${displayNumber}. ${step.instruction}`;
       // Narrate duration if available
       if (step.duration) {
         text += `. Duration: ${step.duration}.`;
@@ -80,11 +77,11 @@ export function StepNavigator({ steps }: StepNavigatorProps) {
   const voiceCommands: VoiceCommand[] = useMemo(() => [
     { 
       phrases: ['next', 'next step', 'go next', 'skip'], 
-      action: () => { setLastHeardCommand('next'); goToNext(); } 
+      action: () => { setLastHeardCommand('next'); setIsPlaying(false); stopSpeaking(); goToNext(); } 
     },
     { 
       phrases: ['back', 'previous', 'go back', 'last step'], 
-      action: () => { setLastHeardCommand('back'); goToPrev(); } 
+      action: () => { setLastHeardCommand('back'); setIsPlaying(false); stopSpeaking(); goToPrev(); } 
     },
     { 
       phrases: ['repeat', 'again', 'say again', 'read'], 
@@ -185,7 +182,7 @@ export function StepNavigator({ steps }: StepNavigatorProps) {
             
             {/* Step Header */}
             <div className="flex items-start justify-between mb-4">
-               <button
+              {/* <button
                 onClick={() => toggleStepComplete(currentStep)}
                 className={`flex-shrink-0 w-11 h-11 rounded-xl flex items-center justify-center text-base font-bold transition-all duration-200 ${
                   completedSteps.has(currentStep)
@@ -195,14 +192,8 @@ export function StepNavigator({ steps }: StepNavigatorProps) {
               >
                 {completedSteps.has(currentStep) ? (
                   <Check className="w-5 h-5" />
-                ) : currentStepData.number === 0 ? (
-                  <span className="text-sm">👋</span>
-                ) : currentStepData.number > steps.length - 1 ? (
-                  <span className="text-sm">🎉</span>
-                ) : (
-                  currentStepData.number
-                )}
-              </button>
+                ) : currentStep + 1}
+              </button> */}
               
               {currentStepData.duration && (
                 <div className="px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 text-xs font-semibold flex items-center gap-1">
@@ -240,7 +231,7 @@ export function StepNavigator({ steps }: StepNavigatorProps) {
                <button
                  onClick={() => { setIsPlaying(false); goToPrev(); }}
                  disabled={currentStep === 0}
-                className="w-11 h-11 rounded-xl flex items-center justify-center border border-cream-200 dark:border-charcoal-700 text-charcoal-500 hover:bg-cream-50 dark:hover:bg-charcoal-800 disabled:opacity-30 transition-colors"
+                className="w-11 h-11 rounded-xl flex items-center justify-center bg-sage-500 text-white hover:bg-sage-600 disabled:opacity-30 transition-colors"
                >
                 <ChevronLeft className="w-5 h-5" />
                </button>
@@ -403,14 +394,14 @@ export function StepNavigator({ steps }: StepNavigatorProps) {
           <div className="bg-charcoal-900 text-white px-4 py-2 rounded-full text-sm font-medium shadow-lg flex flex-col items-center gap-1">
             <div className="flex items-center gap-2">
               <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-            </span>
+              </span>
               <span>{transcript ? `"${transcript}"` : 'Listening...'}</span>
             </div>
             {lastHeardCommand && (
               <span className="text-xs text-emerald-400 font-mono">
-                Cmd: {lastHeardCommand}
+                Matched: {lastHeardCommand}
               </span>
             )}
           </div>
@@ -420,13 +411,13 @@ export function StepNavigator({ steps }: StepNavigatorProps) {
       {/* Step Pills */}
       <div className="overflow-x-auto -mx-4 px-4 pb-2 scrollbar-hide">
         <div className="flex gap-1.5 min-w-max">
-          {steps.map((step, index) => (
+          {steps.map((_, index) => (
             <button
               key={index}
               onClick={() => { setCurrentStep(index); setIsPlaying(false); }}
               className={`flex-shrink-0 w-9 h-9 rounded-full font-semibold text-xs transition-all flex items-center justify-center ${
                 index === currentStep
-                  ? 'bg-sage-500 text-white scale-110'
+                  ? 'bg-sage-500 text-white scale'
                   : completedSteps.has(index)
                   ? 'bg-sage-100 text-sage-700 dark:bg-sage-900/30 dark:text-sage-400'
                   : 'bg-cream-100 dark:bg-charcoal-800 text-charcoal-400 hover:bg-cream-200 dark:hover:bg-charcoal-700'
@@ -435,7 +426,7 @@ export function StepNavigator({ steps }: StepNavigatorProps) {
               {completedSteps.has(index) && index !== currentStep ? (
                 <Check className="w-3.5 h-3.5" />
               ) : (
-                step.number === 0 ? '👋' : step.number > steps.length - 1 ? '🎉' : step.number
+                index + 1
               )}
             </button>
           ))}

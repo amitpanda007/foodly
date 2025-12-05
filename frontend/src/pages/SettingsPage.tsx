@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, ListChecks, ChevronDown, ChevronUp } from 'lucide-react';
 import { api } from '../services/api';
 import { VoiceOption } from '../types';
 import { LoadingSpinner } from '../components/LoadingSpinner';
@@ -11,6 +11,14 @@ interface SettingsPageProps {
   userId: string;
 }
 
+const HOTKEYS = [
+  { action: 'Next step', phrases: ['next', 'next step', 'go next', 'skip'] },
+  { action: 'Previous step', phrases: ['back', 'previous', 'go back', 'last step'] },
+  { action: 'Repeat step', phrases: ['repeat', 'again', 'say again', 'read'] },
+  { action: 'Pause / Stop', phrases: ['stop', 'pause', 'quiet', 'hush'] },
+  { action: 'Play / Resume', phrases: ['play', 'start', 'go', 'begin'] },
+];
+
 export function SettingsPage({ userId }: SettingsPageProps) {
   const [voices, setVoices] = useState<VoiceOption[]>([]);
   const [currentVoice, setCurrentVoice] = useState<string | null>(null);
@@ -20,6 +28,7 @@ export function SettingsPage({ userId }: SettingsPageProps) {
   const [success, setSuccess] = useState<string | null>(null);
   const [previewingVoiceId, setPreviewingVoiceId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [showHotwords, setShowHotwords] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
@@ -119,15 +128,59 @@ export function SettingsPage({ userId }: SettingsPageProps) {
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-10 space-y-8">
-      <SEO title="Settings - Foodly" description="Configure voice settings and preferences for Foodly." />
-      <div>
-        <h1 className="text-3xl font-bold text-charcoal-900 dark:text-white mb-2">
-          Voice Settings
+    <div className="max-w-5xl mx-auto px-4 py-10 space-y-8">
+      <SEO title="Settings - Foodly" description="Configure app and voice settings for Foodly." />
+      <div className="space-y-2">
+        <h1 className="text-3xl font-bold text-charcoal-900 dark:text-white">
+          Settings
         </h1>
         <p className="text-charcoal-500 dark:text-charcoal-300">
-          Preview each narrator, then choose the one you want Foodly to use when generating
-          recipe audio.
+          Configure app preferences and voice options for your cooking sessions.
+        </p>
+      </div>
+
+      {/* Hotwords Card */}
+      <div className="bg-white dark:bg-charcoal-900 border border-cream-200 dark:border-charcoal-800 rounded-2xl shadow-sm">
+        <button
+          type="button"
+          onClick={() => setShowHotwords(!showHotwords)}
+          className="w-full px-5 py-4 border-b border-cream-200 dark:border-charcoal-800 flex items-center justify-between gap-3 hover:bg-cream-50 dark:hover:bg-charcoal-800/50 transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-sage-100 dark:bg-sage-900/30 flex items-center justify-center text-sage-600">
+              <ListChecks className="w-5 h-5" />
+            </div>
+            <div className="text-left">
+              <h2 className="text-lg font-semibold text-charcoal-900 dark:text-white">Voice Hotwords</h2>
+              <p className="text-sm text-charcoal-500 dark:text-charcoal-400">Available voice commands while cooking</p>
+            </div>
+          </div>
+          {showHotwords ? <ChevronUp className="w-5 h-5 text-charcoal-400" /> : <ChevronDown className="w-5 h-5 text-charcoal-400" />}
+        </button>
+
+        {showHotwords && (
+          <div className="grid md:grid-cols-2 gap-4 p-2">
+            {HOTKEYS.map(({ action, phrases }) => (
+              <div key={action} className="rounded-xl border border-cream-200 dark:border-charcoal-800 p-4 bg-cream-50/60 dark:bg-charcoal-800/40">
+                <p className="text-sm font-semibold text-charcoal-900 dark:text-white mb-2">{action}</p>
+                <div className="flex flex-wrap gap-2">
+                  {phrases.map((p) => (
+                    <span key={p} className="px-2.5 py-1 rounded-full text-xs font-medium bg-white dark:bg-charcoal-900 border border-cream-200 dark:border-charcoal-700 text-charcoal-700 dark:text-charcoal-200">
+                      {p}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Voice Settings Section */}
+      <div className="space-y-3">
+        <h2 className="text-2xl font-bold text-charcoal-900 dark:text-white">Voice Settings</h2>
+        <p className="text-charcoal-500 dark:text-charcoal-300">
+          Preview each narrator, then choose the one you want Foodly to use when generating recipe audio.
         </p>
       </div>
 

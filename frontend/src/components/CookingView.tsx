@@ -6,8 +6,7 @@ import {
   ExternalLink, 
   Share2, 
   ChevronDown,
-  Check,
-  X
+  Check
 } from 'lucide-react';
 import { Recipe, Step } from '../types';
 import { StepNavigator } from './StepNavigator';
@@ -101,7 +100,7 @@ export function CookingView({ recipe, onBack }: CookingViewProps) {
           <div className="flex items-center gap-2 bg-sage-600 text-white px-4 py-2.5 rounded-full shadow-lg text-sm font-medium">
             <Check className="w-4 h-4" />
             Link copied!
-          </div>
+            </div>
           </div>
         )}
         
@@ -140,7 +139,7 @@ export function CookingView({ recipe, onBack }: CookingViewProps) {
       </header>
 
       {/* Main Content */}
-      <main className="pb-24 lg:pb-8">
+      <main className="pb-28 lg:pb-28">
         {/* Recipe Hero - Compact on mobile */}
         <div className="bg-white dark:bg-charcoal-900 border-b border-cream-200 dark:border-charcoal-800">
           {recipe.image_url && (
@@ -181,49 +180,16 @@ export function CookingView({ recipe, onBack }: CookingViewProps) {
           </div>
         </div>
 
-        {/* Desktop Layout */}
-        <div className="hidden lg:grid lg:grid-cols-3 gap-6 max-w-7xl mx-auto px-4 py-6">
-          {/* Ingredients Sidebar */}
-          <div className="lg:col-span-1">
-            <div className="sticky top-20 bg-white dark:bg-charcoal-900 rounded-2xl border border-cream-200 dark:border-charcoal-800 overflow-hidden">
-              <div className="px-5 py-4 border-b border-cream-200 dark:border-charcoal-800">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-semibold text-charcoal-900 dark:text-white">Ingredients</h3>
-                  <span className="text-sm text-sage-600 font-medium">{ingredientProgress}%</span>
-                </div>
-                <div className="mt-2 h-1.5 bg-cream-200 dark:bg-charcoal-800 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-sage-500 transition-all duration-300 rounded-full"
-                    style={{ width: `${ingredientProgress}%` }}
-                  />
-                </div>
-              </div>
-              <div className="p-4 max-h-[60vh] overflow-y-auto">
-                <IngredientsList
-                  ingredients={recipe.ingredients}
-                  checkedItems={checkedIngredients}
-                  onToggleItem={toggleIngredient}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Steps Main Area */}
-          <div className="lg:col-span-2">
-            <StepNavigator steps={augmentedSteps} />
-          </div>
-        </div>
-
-        {/* Mobile Layout - Steps Only */}
-        <div className="lg:hidden px-4 py-4">
+        {/* Steps Area */}
+        <div className="max-w-5xl mx-auto px-4 py-6">
           <StepNavigator steps={augmentedSteps} />
         </div>
       </main>
 
-      {/* Mobile Bottom Bar - Ingredients Toggle */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-charcoal-900 border-t border-cream-200 dark:border-charcoal-800 safe-area-bottom">
+      {/* Bottom Ingredients Toggle - minimized by default */}
+      <div className="fixed bottom-16 md:bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-charcoal-900/95 backdrop-blur border-t border-cream-200 dark:border-charcoal-800 shadow-lg transition-all duration-300">
         <button
-          onClick={() => setShowIngredients(true)}
+          onClick={() => setShowIngredients((v) => !v)}
           className="w-full flex items-center justify-between px-4 py-3"
         >
           <div className="flex items-center gap-3">
@@ -236,63 +202,19 @@ export function CookingView({ recipe, onBack }: CookingViewProps) {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <div className="w-16 h-2 bg-cream-200 dark:bg-charcoal-800 rounded-full overflow-hidden">
+            <div className="w-20 h-2 bg-cream-200 dark:bg-charcoal-800 rounded-full overflow-hidden">
               <div 
                 className="h-full bg-sage-500 transition-all duration-300"
                 style={{ width: `${ingredientProgress}%` }}
               />
             </div>
-            <ChevronDown className="w-5 h-5 text-charcoal-400 rotate-180" />
+            <ChevronDown className={`w-5 h-5 text-charcoal-400 transition-transform ${showIngredients ? '' : 'rotate-180'}`} />
           </div>
         </button>
-      </div>
 
-      {/* Mobile Ingredients Modal */}
-      {showIngredients && (
-        <div className="lg:hidden fixed inset-0 z-50">
-          {/* Backdrop */}
-          <div 
-            className="absolute inset-0 bg-black/40"
-            onClick={() => setShowIngredients(false)}
-          />
-          
-          {/* Sheet */}
-          <div className="absolute bottom-0 left-0 right-0 bg-white dark:bg-charcoal-900 rounded-t-2xl max-h-[85vh] flex flex-col animate-slide-up safe-area-bottom">
-            {/* Handle */}
-            <div className="flex justify-center pt-3 pb-2">
-              <div className="w-10 h-1 bg-charcoal-300 dark:bg-charcoal-700 rounded-full" />
-            </div>
-            
-            {/* Header */}
-            <div className="flex items-center justify-between px-4 pb-3 border-b border-cream-200 dark:border-charcoal-800">
-              <div>
-                <h3 className="text-lg font-semibold text-charcoal-900 dark:text-white">Ingredients</h3>
-                <p className="text-sm text-charcoal-500">{checkedIngredients.size} of {recipe.ingredients.length} ready</p>
-              </div>
-              <button
-                onClick={() => setShowIngredients(false)}
-                className="p-2 rounded-lg hover:bg-cream-100 dark:hover:bg-charcoal-800 transition-colors"
-              >
-                <X className="w-5 h-5 text-charcoal-500" />
-              </button>
-            </div>
-            
-            {/* Progress */}
-            <div className="px-4 py-3 bg-cream-50 dark:bg-charcoal-800/50">
-              <div className="flex items-center justify-between text-sm mb-2">
-                <span className="text-charcoal-600 dark:text-charcoal-400">Progress</span>
-                <span className="font-semibold text-sage-600">{ingredientProgress}%</span>
-              </div>
-              <div className="h-2 bg-cream-200 dark:bg-charcoal-700 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-sage-500 transition-all duration-300 rounded-full"
-                  style={{ width: `${ingredientProgress}%` }}
-                />
-                  </div>
-               </div>
-               
-            {/* List */}
-            <div className="flex-1 overflow-y-auto p-4">
+        {showIngredients && (
+          <div className="border-t border-cream-200 dark:border-charcoal-800 max-h-[45vh] overflow-y-auto px-4 pb-4">
+            <div className="py-3">
               <IngredientsList
                 ingredients={recipe.ingredients}
                 checkedItems={checkedIngredients}
@@ -300,8 +222,8 @@ export function CookingView({ recipe, onBack }: CookingViewProps) {
               />
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

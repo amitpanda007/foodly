@@ -52,7 +52,17 @@ export function useSpeechRecognition(commands: VoiceCommand[]) {
   const [isSupported, setIsSupported] = useState(false);
   const [transcript, setTranscript] = useState('');
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const shouldListenRef = useRef(false);
+  // Store commands in a ref so the recognition instance doesn't need to be recreated when commands change
+  const commandsRef = useRef<VoiceCommand[]>(commands);
+  const lastCommandAtRef = useRef<number>(0);
 
+  // Keep commandsRef up to date
+  useEffect(() => {
+    commandsRef.current = commands;
+  }, [commands]);
+
+  // Initialize recognition once
   useEffect(() => {
     const SpeechRecognitionAPI =
       window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -77,23 +87,32 @@ export function useSpeechRecognition(commands: VoiceCommand[]) {
           }
         }
 
-        // Combine final and interim to capture commands immediately
         const currentTranscript = finalTranscript + interimTranscript;
         setTranscript(currentTranscript);
 
         if (currentTranscript) {
           const lowerTranscript = currentTranscript.toLowerCase().trim();
 
-          for (const command of commands) {
+          // Use commandsRef.current to always access the latest commands
+          for (const command of commandsRef.current) {
             for (const phrase of command.phrases) {
-              // Check if the phrase is present in the detected speech
               if (lowerTranscript.includes(phrase.toLowerCase())) {
+                const now = Date.now();
+                // Throttle commands to avoid double-trigger from interim/final duplicates
+                if (now - lastCommandAtRef.current < 400) {
+                  return;
+                }
+                lastCommandAtRef.current = now;
+
                 console.log(`[Speech] Matched command: "${phrase}" in "${lowerTranscript}"`);
                 command.action();
-                
-                // Abort and restart to clear the buffer and prevent double-triggering
-                // The onend handler will restart it automatically
-                recognition.abort();
+                // Clear transcript and restart recognition to clear buffer
+                setTranscript('');
+                try {
+                  recognition.stop();
+                } catch (e) {
+                  // ignore
+                }
                 return;
               }
             }
@@ -102,13 +121,29 @@ export function useSpeechRecognition(commands: VoiceCommand[]) {
       };
 
       recognition.onend = () => {
-        if (isListening) {
-          recognition.start();
+        // Restart if we should still be listening
+        if (shouldListenRef.current) {
+          setTimeout(() => {
+            if (shouldListenRef.current && recognitionRef.current) {
+              try {
+                recognitionRef.current.start();
+              } catch (e) {
+                // ignore - might already be started
+              }
+            }
+          }, 100);
         }
       };
 
-      recognition.onerror = () => {
-        setIsListening(false);
+      recognition.onerror = (event) => {
+        // @ts-ignore
+        const errorType = event.error;
+        // Ignore no-speech and aborted errors - these are expected
+        if (errorType !== 'no-speech' && errorType !== 'aborted') {
+          console.error("Speech Recognition Error", event);
+          setIsListening(false);
+          shouldListenRef.current = false;
+        }
       };
 
       recognitionRef.current = recognition;
@@ -116,27 +151,44 @@ export function useSpeechRecognition(commands: VoiceCommand[]) {
 
     return () => {
       if (recognitionRef.current) {
-        recognitionRef.current.abort();
+        shouldListenRef.current = false;
+        recognitionRef.current.onend = null;
+        recognitionRef.current.onerror = null;
+        recognitionRef.current.onresult = null;
+        try {
+          recognitionRef.current.stop();
+        } catch (e) {
+          // ignore
+        }
       }
     };
-  }, [commands, isListening]);
+  }, []); // Empty deps - only initialize once
 
-  const startListening = useCallback(() => {
-    if (recognitionRef.current && !isListening) {
+  // Handle listening state changes
+  useEffect(() => {
+    shouldListenRef.current = isListening;
+    
+    if (isListening && recognitionRef.current) {
       try {
         recognitionRef.current.start();
-        setIsListening(true);
-      } catch {
-        // Already started
+      } catch (e) {
+        // ignore if already started
+      }
+    } else if (!isListening && recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch (e) {
+        // ignore
       }
     }
   }, [isListening]);
 
+  const startListening = useCallback(() => {
+    setIsListening(true);
+  }, []);
+
   const stopListening = useCallback(() => {
-    if (recognitionRef.current) {
-      recognitionRef.current.stop();
-      setIsListening(false);
-    }
+    setIsListening(false);
   }, []);
 
   const toggleListening = useCallback(() => {

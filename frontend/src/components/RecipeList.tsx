@@ -20,7 +20,7 @@ export function RecipeList({ recipes, onSelect, onDelete, onSearch }: RecipeList
 
   return (
     <div className="space-y-6 pb-20 md:pb-0">
-      <form onSubmit={handleSearch} className="relative sticky top-20 z-30 md:static">
+      <form onSubmit={handleSearch} className="relative max-w-3xl mx-auto w-full">
         <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
           <Search className="h-5 w-5 text-charcoal-400" />
         </div>
