@@ -18,6 +18,7 @@ const HOTKEYS = [
   { action: 'Next step', phrases: ['next', 'next step', 'go next', 'skip'] },
   { action: 'Previous step', phrases: ['back', 'previous', 'go back', 'last step'] },
   { action: 'Repeat step', phrases: ['repeat', 'again', 'say again', 'read'] },
+  { action: 'List ingredients', phrases: ['list ingredients', 'read ingredients', 'ingredients', 'what are the ingredients'] },
   { action: 'Pause / Stop', phrases: ['stop', 'pause', 'quiet', 'hush'] },
   { action: 'Play / Resume', phrases: ['play', 'start', 'go', 'begin'] },
   { action: 'Toggle auto-play', phrases: ['auto play', 'autoplay', 'toggle auto play', 'turn on auto play', 'turn off auto play'] },

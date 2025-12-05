@@ -69,10 +69,10 @@ function AppContent() {
   useEffect(() => {
     const handleRouting = async () => {
       const path = window.location.pathname;
-      const match = path.match(/^\/recipes\/(\d+)$/);
+      const match = path.match(/^\/recipes\/([a-fA-F0-9-]{6,})$/);
       
       if (match) {
-        const recipeId = parseInt(match[1], 10);
+        const recipeId = match[1];
         setIsLoadingRecipe(true);
         
         try {

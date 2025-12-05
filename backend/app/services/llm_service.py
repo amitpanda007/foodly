@@ -422,6 +422,37 @@ REMEMBER: Split instructions into as many small, logical steps as possible. Do n
                     except Exception as e:
                         print(f"[TTS] Failed to generate outro audio: {e}")
 
+                # Generate Ingredients Audio
+                ingredients = data.get("ingredients", [])
+                if ingredients:
+                    try:
+                        ing_text = "Ingredients. "
+                        ing_list = []
+                        for ing in ingredients:
+                            if isinstance(ing, dict):
+                                parts = []
+                                if ing.get('amount'): parts.append(ing.get('amount'))
+                                if ing.get('unit'): parts.append(ing.get('unit'))
+                                if ing.get('name'): parts.append(ing.get('name'))
+                                item = " ".join(parts)
+                                if ing.get('notes'):
+                                    item += f", {ing.get('notes')}"
+                                ing_list.append(item)
+                            elif isinstance(ing, str):
+                                ing_list.append(ing)
+                        
+                        ing_text += ". ".join(ing_list)
+                        
+                        # Limit length to avoid issues
+                        if len(ing_text) > 4000:
+                            ing_text = ing_text[:4000] + "..."
+                            
+                        ing_url = await tts.generate_audio(ing_text, voice=voice)
+                        data["ingredients_audio_url"] = ing_url
+                        print(f"[TTS] Ingredients audio: {ing_url}")
+                    except Exception as e:
+                        print(f"[TTS] Failed to generate ingredients audio: {e}")
+
                 async def process_step_audio(step):
                     instruction = step.get("instruction", "")
                     if instruction:

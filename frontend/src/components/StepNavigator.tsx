@@ -12,7 +12,8 @@ import {
   Settings,
   X,
   AlertCircle,
-  Clock
+  Clock,
+  Maximize2
 } from 'lucide-react';
 import { Step } from '../types';
 import { useSpeechRecognition, useSpeechSynthesis, VoiceCommand } from '../hooks/useSpeech';
@@ -20,11 +21,13 @@ import { useWakeLock } from '../hooks/useWakeLock';
 
 interface StepNavigatorProps {
   steps: Step[];
+  ingredientsAudioUrl?: string | null;
 }
 
-export function StepNavigator({ steps }: StepNavigatorProps) {
+export function StepNavigator({ steps, ingredientsAudioUrl }: StepNavigatorProps) {
   const AUTO_PLAY_KEY = 'foodly:autoPlay';
 
+  const [isExpanded, setIsExpanded] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
   const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
   const [autoAdvance, setAutoAdvance] = useState<boolean>(() => {
@@ -78,6 +81,18 @@ export function StepNavigator({ steps }: StepNavigatorProps) {
     }
   }, [currentStep, steps, speak]);
 
+  const playIngredients = useCallback(() => {
+    if (ingredientsAudioUrl) {
+       setIsPlaying(false);
+       stopSpeaking();
+       // We pass a placeholder text because the audio URL takes precedence in our tts service wrapper usually
+       // or if text is fallback. The prompt says "play the audio which lists out the ingredients".
+       speak("Here are the ingredients.", undefined, ingredientsAudioUrl);
+    } else {
+       speak("Sorry, I don't have audio for the ingredients list.");
+    }
+  }, [ingredientsAudioUrl, speak, stopSpeaking]);
+
   // Voice Commands
   const voiceCommands: VoiceCommand[] = useMemo(() => [
     { 
@@ -91,6 +106,10 @@ export function StepNavigator({ steps }: StepNavigatorProps) {
     { 
       phrases: ['repeat', 'again', 'say again', 'read'], 
       action: () => { setLastHeardCommand('repeat'); readCurrentStep(); } 
+    },
+    { 
+      phrases: ['list ingredients', 'read ingredients', 'ingredients', 'what are the ingredients'], 
+      action: () => { setLastHeardCommand('ingredients'); playIngredients(); } 
     },
     { 
       phrases: ['stop', 'pause', 'quiet', 'hush'], 
@@ -112,7 +131,7 @@ export function StepNavigator({ steps }: StepNavigatorProps) {
       phrases: ['turn off auto play', 'disable auto play', 'turn off autoplay', 'disable autoplay'], 
       action: () => { setLastHeardCommand('auto play off'); setAutoAdvance(false); } 
     },
-  ], [goToNext, goToPrev, readCurrentStep, stopSpeaking]);
+  ], [goToNext, goToPrev, readCurrentStep, stopSpeaking, playIngredients]);
 
   const {
     isListening,
@@ -205,25 +224,22 @@ export function StepNavigator({ steps }: StepNavigatorProps) {
             
             {/* Step Header */}
             <div className="flex items-start justify-between mb-4">
-              {/* <button
-                onClick={() => toggleStepComplete(currentStep)}
-                className={`flex-shrink-0 w-11 h-11 rounded-xl flex items-center justify-center text-base font-bold transition-all duration-200 ${
-                  completedSteps.has(currentStep)
-                    ? 'bg-sage-500 text-white'
-                    : 'bg-cream-100 dark:bg-charcoal-800 text-charcoal-700 dark:text-charcoal-300'
-                }`}
-              >
-                {completedSteps.has(currentStep) ? (
-                  <Check className="w-5 h-5" />
-                ) : currentStep + 1}
-              </button> */}
-              
-              {currentStepData.duration && (
-                <div className="px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 text-xs font-semibold flex items-center gap-1">
-                  <Clock className="w-3.5 h-3.5" />
-                  {currentStepData.duration}
-                </div>
-              )}
+              <div />
+              <div className="flex items-center gap-2 ml-auto">
+                {currentStepData.duration && (
+                  <div className="px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 text-xs font-semibold flex items-center gap-1">
+                    <Clock className="w-3.5 h-3.5" />
+                    {currentStepData.duration}
+                  </div>
+                )}
+                <button
+                  onClick={() => setIsExpanded(true)}
+                  className="p-2 rounded-lg text-charcoal-400 hover:text-charcoal-600 hover:bg-cream-100 dark:hover:bg-charcoal-800 transition-colors"
+                  title="Expand View"
+                >
+                  <Maximize2 className="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
             {/* Instruction */}
@@ -353,7 +369,7 @@ export function StepNavigator({ steps }: StepNavigatorProps) {
 
           {/* Settings Popover */}
           {showSettings && (
-        <div className="fixed inset-0 z-50" onClick={() => setShowSettings(false)}>
+        <div className="fixed inset-0 z-[110]" onClick={() => setShowSettings(false)}>
           <div className="absolute inset-0 bg-black/20" />
           <div 
             className="absolute bottom-32 left-1/2 -translate-x-1/2 w-72 bg-white dark:bg-charcoal-900 rounded-2xl shadow-xl border border-cream-200 dark:border-charcoal-800 p-4"
@@ -384,7 +400,7 @@ export function StepNavigator({ steps }: StepNavigatorProps) {
 
       {/* Reset Confirmation Modal */}
       {showResetConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
           <div className="bg-white dark:bg-charcoal-900 rounded-2xl p-5 max-w-xs w-full shadow-xl border border-cream-200 dark:border-charcoal-800">
             <div className="text-center mb-5">
               <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/30 text-red-500 flex items-center justify-center mx-auto mb-3">
@@ -455,6 +471,83 @@ export function StepNavigator({ steps }: StepNavigatorProps) {
           ))}
         </div>
       </div>
+
+      {isExpanded && (
+        <div className="fixed inset-0 z-[100] bg-white dark:bg-charcoal-900 flex flex-col animate-fade-in">
+          {/* Header */}
+          <div className="flex items-center justify-between p-4 border-b border-cream-200 dark:border-charcoal-800">
+             <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-charcoal-500">Step {currentStep + 1}/{steps.length}</span>
+             </div>
+             <button
+                onClick={() => setIsExpanded(false)}
+                className="p-2 rounded-full hover:bg-cream-100 dark:hover:bg-charcoal-800 text-charcoal-500 transition-colors"
+             >
+                <X className="w-6 h-6" />
+             </button>
+          </div>
+
+          {/* Content */}
+          <div className="flex-1 overflow-y-auto p-6 flex flex-col justify-center items-center text-center">
+              <p className="text-2xl md:text-4xl font-medium leading-relaxed text-charcoal-900 dark:text-white">
+                 {currentStepData.instruction}
+              </p>
+              {currentStepData.tips && (
+                 <div className="mt-8 bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-xl text-indigo-800 dark:text-indigo-200 max-w-2xl">
+                    <p className="font-bold uppercase text-xs mb-2 opacity-70">Pro Tip</p>
+                    <p className="text-lg">{currentStepData.tips}</p>
+                 </div>
+              )}
+          </div>
+
+          {/* Controls */}
+          <div className="p-6 pb-10 border-t border-cream-200 dark:border-charcoal-800 bg-white dark:bg-charcoal-900">
+             <div className="flex items-center justify-between mb-6 max-w-md mx-auto w-full">
+                <button
+                   onClick={() => { setIsPlaying(false); goToPrev(); }}
+                   disabled={currentStep === 0}
+                   className="p-4 rounded-full bg-cream-100 dark:bg-charcoal-800 text-charcoal-900 dark:text-white disabled:opacity-30"
+                >
+                   <ChevronLeft className="w-6 h-6" />
+                </button>
+
+                 {ttsSupported && (
+                    <button
+                       onClick={() => setIsPlaying(!isPlaying)}
+                       className="w-16 h-16 rounded-full bg-sage-500 text-white flex items-center justify-center shadow-lg hover:bg-sage-600 transition-colors"
+                    >
+                       {isPlaying ? <Pause className="w-8 h-8" /> : <Play className="w-8 h-8 ml-1" />}
+                    </button>
+                 )}
+
+                <button
+                   onClick={() => { setIsPlaying(false); goToNext(); }}
+                   disabled={currentStep === steps.length - 1}
+                   className="p-4 rounded-full bg-cream-100 dark:bg-charcoal-800 text-charcoal-900 dark:text-white disabled:opacity-30"
+                >
+                   <ChevronRight className="w-6 h-6" />
+                </button>
+             </div>
+
+             <div className="flex justify-center gap-4">
+                 {sttSupported && (
+                     <button
+                        onClick={toggleListening}
+                        className={`p-3 rounded-full ${isListening ? 'bg-red-500 text-white' : 'bg-cream-100 dark:bg-charcoal-800 text-charcoal-600 dark:text-charcoal-300'}`}
+                     >
+                        {isListening ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
+                     </button>
+                 )}
+                 <button
+                     onClick={() => setShowSettings(true)}
+                     className="p-3 rounded-full bg-cream-100 dark:bg-charcoal-800 text-charcoal-600 dark:text-charcoal-300"
+                 >
+                    <Settings className="w-5 h-5" />
+                 </button>
+             </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -14,7 +14,7 @@ export interface Step {
 }
 
 export interface Recipe {
-  id: number;
+  id: string;
   title: string;
   source_url: string;
   source_type: 'website' | 'youtube';
@@ -33,6 +33,7 @@ export interface Recipe {
   outro_text?: string | null;
   intro_audio_url?: string | null;
   outro_audio_url?: string | null;
+  ingredients_audio_url?: string | null;
   user_id?: number | null;
   anonymous_user_id?: string | null;
   is_public?: boolean;
@@ -101,6 +102,6 @@ export interface SignupRequest {
 }
 
 export interface RecipeSaveRequest {
-  recipe_id: number;
+  recipe_id: string;
 }
 

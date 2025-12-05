@@ -17,6 +17,7 @@ from app.services.llm_service import LLMService, get_llm_service
 from app.services.user_settings_service import UserSettingsService
 from app.services.auth_service import AuthService
 from app.models.user import User
+from app.services.tts_service import get_tts_service
 
 router = APIRouter(prefix="/api/recipes", tags=["recipes"])
 
@@ -51,6 +52,7 @@ async def process_recipe(
     """Process a recipe URL (website or YouTube) and save it."""
     recipe_service = RecipeService(db)
     user_settings = UserSettingsService(db)
+    tts_service = get_tts_service()
     
     # Determine user info
     user_id = user.id if user else request.user_id
@@ -69,6 +71,17 @@ async def process_recipe(
     if existing:
         return existing
     
+    # Collect audio URLs so we can clean them up on failure
+    def collect_audio_urls(parsed: dict):
+        urls = []
+        for key in ("intro_audio_url", "outro_audio_url", "ingredients_audio_url"):
+            if parsed.get(key):
+                urls.append(parsed[key])
+        for step in parsed.get("steps", []):
+            if isinstance(step, dict) and step.get("audio_url"):
+                urls.append(step["audio_url"])
+        return urls
+
     try:
         # Scrape the content
         scraped_data = await scraper.scrape(request.url)
@@ -136,17 +149,30 @@ async def process_recipe(
             intro_text=parsed_recipe.get("intro_text"),
             outro_text=parsed_recipe.get("outro_text"),
             intro_audio_url=parsed_recipe.get("intro_audio_url"),
-            outro_audio_url=parsed_recipe.get("outro_audio_url")
+            outro_audio_url=parsed_recipe.get("outro_audio_url"),
+            ingredients_audio_url=parsed_recipe.get("ingredients_audio_url")
         )
         
-        recipe = await recipe_service.create_recipe(
-            recipe_data,
-            user_id=user_id,
-            anonymous_user_id=anonymous_user_id
-        )
+        audio_urls = collect_audio_urls(parsed_recipe)
+
+        # Use a transaction to ensure we don't keep partial data
+        tx_ctx = db.begin_nested() if db.in_transaction() else db.begin()
+        async with tx_ctx:
+            recipe = await recipe_service.create_recipe(
+                recipe_data,
+                user_id=user_id,
+                anonymous_user_id=anonymous_user_id,
+                commit=False  # commit handled by context manager
+            )
         return recipe
         
     except Exception as e:
+        # Clean up any generated audio if something failed
+        try:
+            for url in locals().get("audio_urls", []):
+                tts_service.delete_audio(url)
+        except Exception:
+            pass
         raise HTTPException(status_code=500, detail=f"Failed to process recipe: {str(e)}")
 
 
@@ -203,7 +229,7 @@ async def search_recipes(
 
 @router.get("/{recipe_id}", response_model=RecipeResponse)
 async def get_recipe(
-    recipe_id: int,
+    recipe_id: str,
     db: AsyncSession = Depends(get_db)
 ):
     """Get a specific recipe by ID."""
@@ -216,7 +242,7 @@ async def get_recipe(
 
 @router.delete("/{recipe_id}")
 async def delete_recipe(
-    recipe_id: int,
+    recipe_id: str,
     anonymous_user_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     user: Optional[User] = Depends(get_optional_user)

@@ -61,7 +61,7 @@ export function RecipesPage({ onSelectRecipe }: RecipesPageProps) {
     }
   };
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (id: string) => {
     try {
       await api.deleteRecipe(id, anonymousUserId, accessToken);
       setRecipes((prev) => prev.filter((r) => r.id !== id));

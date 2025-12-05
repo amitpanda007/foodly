@@ -75,7 +75,7 @@ export const api = {
     return handleResponse<RecipeListResponse>(response);
   },
 
-  async getRecipe(id: number): Promise<Recipe> {
+  async getRecipe(id: string): Promise<Recipe> {
     const response = await fetch(`${API_URL}/api/recipes/${id}`);
     return handleResponse<Recipe>(response);
   },
@@ -100,7 +100,7 @@ export const api = {
   },
 
   async deleteRecipe(
-    id: number,
+    id: string,
     anonymousUserId?: string,
     accessToken?: string | null
   ): Promise<void> {

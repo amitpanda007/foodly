@@ -1,5 +1,6 @@
 from pydantic import BaseModel, HttpUrl
 from typing import Optional, List
+from uuid import UUID
 from datetime import datetime
 
 
@@ -42,12 +43,13 @@ class RecipeCreate(BaseModel):
     outro_text: Optional[str] = None
     intro_audio_url: Optional[str] = None
     outro_audio_url: Optional[str] = None
+    ingredients_audio_url: Optional[str] = None
     user_id: Optional[int] = None  # Authenticated user ID
     anonymous_user_id: Optional[str] = None  # Anonymous user ID
 
 
 class RecipeResponse(BaseModel):
-    id: int
+    id: UUID
     title: str
     source_url: str
     source_type: str
@@ -66,6 +68,7 @@ class RecipeResponse(BaseModel):
     outro_text: Optional[str] = None
     intro_audio_url: Optional[str] = None
     outro_audio_url: Optional[str] = None
+    ingredients_audio_url: Optional[str] = None
     user_id: Optional[int] = None
     anonymous_user_id: Optional[str] = None
     is_public: bool = False
@@ -76,7 +79,7 @@ class RecipeResponse(BaseModel):
 
 class RecipeSaveRequest(BaseModel):
     """Request to save a shared recipe to user's profile"""
-    recipe_id: int
+    recipe_id: UUID
 
 
 class RecipeListResponse(BaseModel):

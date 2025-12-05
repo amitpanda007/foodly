@@ -5,13 +5,13 @@ import { Recipe } from '../types';
 interface RecipeListProps {
   recipes: Recipe[];
   onSelect: (recipe: Recipe) => void;
-  onDelete: (id: number) => void;
+  onDelete: (id: string) => void;
   onSearch: (query: string) => void;
 }
 
 export function RecipeList({ recipes, onSelect, onDelete, onSearch }: RecipeListProps) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState<number | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();

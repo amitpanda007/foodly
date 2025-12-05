@@ -1,12 +1,14 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, JSON, ForeignKey, Boolean
+import uuid
+from sqlalchemy import Column, String, Text, DateTime, JSON, ForeignKey, Boolean, Integer
 from sqlalchemy.sql import func
+from sqlalchemy.dialects.postgresql import UUID
 from app.database import Base
 
 
 class Recipe(Base):
     __tablename__ = "recipes"
     
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     # User ownership - either authenticated user_id or anonymous_user_id (from localStorage)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     anonymous_user_id = Column(String(255), nullable=True, index=True)  # For non-logged-in users
@@ -29,6 +31,7 @@ class Recipe(Base):
     outro_text = Column(Text, nullable=True)
     intro_audio_url = Column(String(2000), nullable=True)
     outro_audio_url = Column(String(2000), nullable=True)
+    ingredients_audio_url = Column(String(2000), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     

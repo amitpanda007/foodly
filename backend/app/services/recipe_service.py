@@ -1,5 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, or_, func, and_
+from sqlalchemy import select, or_, func, and_, cast, String
 from sqlalchemy.orm import selectinload
 from typing import List, Optional
 from app.models.recipe import Recipe
@@ -15,7 +15,8 @@ class RecipeService:
         self,
         recipe_data: RecipeCreate,
         user_id: Optional[int] = None,
-        anonymous_user_id: Optional[str] = None
+        anonymous_user_id: Optional[str] = None,
+        commit: bool = True
     ) -> Recipe:
         # Convert pydantic models to dicts for JSON storage
         ingredients = [ing.model_dump() for ing in recipe_data.ingredients]
@@ -39,17 +40,22 @@ class RecipeService:
             outro_text=recipe_data.outro_text,
             intro_audio_url=recipe_data.intro_audio_url,
             outro_audio_url=recipe_data.outro_audio_url,
+            ingredients_audio_url=recipe_data.ingredients_audio_url,
             user_id=user_id or recipe_data.user_id,
             anonymous_user_id=anonymous_user_id or recipe_data.anonymous_user_id
         )
         
         self.db.add(recipe)
-        await self.db.commit()
-        await self.db.refresh(recipe)
+        if commit:
+            await self.db.commit()
+            await self.db.refresh(recipe)
+        else:
+            await self.db.flush()
+            await self.db.refresh(recipe)
         
         return recipe
     
-    async def get_recipe(self, recipe_id: int) -> Optional[Recipe]:
+    async def get_recipe(self, recipe_id: str) -> Optional[Recipe]:
         result = await self.db.execute(
             select(Recipe).where(Recipe.id == recipe_id)
         )
@@ -148,7 +154,7 @@ class RecipeService:
     
     async def delete_recipe(
         self,
-        recipe_id: int,
+        recipe_id: str,
         user_id: Optional[int] = None,
         anonymous_user_id: Optional[str] = None
     ) -> bool:
@@ -171,25 +177,44 @@ class RecipeService:
             if recipe.user_id or recipe.anonymous_user_id:
                 return False
 
-        # Delete associated audio files
-        tts_service = get_tts_service()
-        
-        # Delete intro/outro
+        # Identify audio files to potentially delete
+        audio_urls = set()
         if recipe.intro_audio_url:
-            tts_service.delete_audio(recipe.intro_audio_url)
+            audio_urls.add(recipe.intro_audio_url)
         if recipe.outro_audio_url:
-            tts_service.delete_audio(recipe.outro_audio_url)
+            audio_urls.add(recipe.outro_audio_url)
+        if recipe.ingredients_audio_url:
+            audio_urls.add(recipe.ingredients_audio_url)
             
         if recipe.steps:
             for step in recipe.steps:
-                # step is a dict here because it's loaded from JSONB
-                if isinstance(step, dict):
-                    audio_url = step.get("audio_url")
-                    if audio_url:
-                        tts_service.delete_audio(audio_url)
-
+                if isinstance(step, dict) and step.get("audio_url"):
+                    audio_urls.add(step.get("audio_url"))
+        
+        # Delete recipe record first
         await self.db.delete(recipe)
         await self.db.commit()
+        
+        # Check if audio files are still in use by other recipes before deleting from disk
+        tts_service = get_tts_service()
+        
+        for url in audio_urls:
+            # Check usage in other recipes
+            # Cast JSON steps to string for searching
+            stmt = select(func.count(Recipe.id)).where(
+                or_(
+                    Recipe.intro_audio_url == url,
+                    Recipe.outro_audio_url == url,
+                    Recipe.ingredients_audio_url == url,
+                    cast(Recipe.steps, String).like(f'%{url}%')
+                )
+            )
+            result = await self.db.execute(stmt)
+            count = result.scalar()
+            
+            if count == 0:
+                tts_service.delete_audio(url)
+
         return True
     
     async def count_recipes(self) -> int:
@@ -241,9 +266,10 @@ class RecipeService:
     
     async def copy_recipe_to_user(
         self,
-        recipe_id: int,
+        recipe_id: str,
         user_id: Optional[int] = None,
-        anonymous_user_id: Optional[str] = None
+        anonymous_user_id: Optional[str] = None,
+        commit: bool = True
     ) -> Optional[Recipe]:
         """Copy a shared recipe to user's profile"""
         original = await self.get_recipe(recipe_id)
@@ -269,14 +295,19 @@ class RecipeService:
             outro_text=original.outro_text,
             intro_audio_url=original.intro_audio_url,
             outro_audio_url=original.outro_audio_url,
+            ingredients_audio_url=original.ingredients_audio_url,
             user_id=user_id,
             anonymous_user_id=anonymous_user_id,
             is_public=False
         )
         
         self.db.add(new_recipe)
-        await self.db.commit()
-        await self.db.refresh(new_recipe)
+        if commit:
+            await self.db.commit()
+            await self.db.refresh(new_recipe)
+        else:
+            await self.db.flush()
+            await self.db.refresh(new_recipe)
         
         return new_recipe
     
