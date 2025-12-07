@@ -1,5 +1,5 @@
 from pydantic import BaseModel, HttpUrl
-from typing import Optional, List
+from typing import Optional, List, Dict
 from uuid import UUID
 from datetime import datetime
 
@@ -86,3 +86,18 @@ class RecipeListResponse(BaseModel):
     recipes: List[RecipeResponse]
     total: int
 
+
+class ProductLink(BaseModel):
+    title: Optional[str] = None
+    link: Optional[str] = None
+    source: Optional[str] = None
+    price: Optional[str] = None
+
+
+class ShoppingItem(BaseModel):
+    ingredient_name: str
+    products: List[ProductLink]
+
+
+class ShoppingListResponse(BaseModel):
+    items: List[ShoppingItem]

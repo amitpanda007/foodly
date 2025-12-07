@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { 
   ArrowLeft, 
   Clock, 
@@ -8,21 +8,136 @@ import {
   ChevronDown,
   Check
 } from 'lucide-react';
-import { Recipe, Step } from '../types';
+import { Recipe, Step, ShoppingItem } from '../types';
 import { StepNavigator } from './StepNavigator';
 import { IngredientsList } from './IngredientsList';
 import { SEO } from './SEO';
 import { SaveRecipeButton } from './SaveRecipeButton';
+import { api } from '../services/api';
 
 interface CookingViewProps {
   recipe: Recipe;
   onBack: () => void;
 }
 
+// Mapping of timezone city -> ISO country code (derived from moment-timezone meta, first country per zone)
+// Limited to countries we support for shopping links to keep bundle size small.
+const TIMEZONE_CITY_TO_COUNTRY: Record<string, string> = {
+  // US
+  New_York: "US",
+  Detroit: "US",
+  Indianapolis: "US",
+  Chicago: "US",
+  Denver: "US",
+  Phoenix: "US",
+  Los_Angeles: "US",
+  Anchorage: "US",
+  Adak: "US",
+  Honolulu: "US",
+  Boise: "US",
+  Sitka: "US",
+  Metlakatla: "US",
+  Juneau: "US",
+  Nome: "US",
+  Yakutat: "US",
+  Louisville: "US",
+  Monticello: "US",
+  Menominee: "US",
+  Center: "US",
+  Knox_IN: "US",
+  Tell_City: "US",
+  Beulah: "US",
+  // UK / GB
+  London: "GB",
+  // CA
+  Toronto: "CA",
+  Vancouver: "CA",
+  Winnipeg: "CA",
+  Edmonton: "CA",
+  Regina: "CA",
+  Halifax: "CA",
+  St_Johns: "CA",
+  Moncton: "CA",
+  Goose_Bay: "CA",
+  Iqaluit: "CA",
+  Yellowknife: "CA",
+  Rankin_Inlet: "CA",
+  Dawson: "CA",
+  Whitehorse: "CA",
+  Atikokan: "CA",
+  Swift_Current: "CA",
+  // AU
+  Sydney: "AU",
+  Melbourne: "AU",
+  Brisbane: "AU",
+  Adelaide: "AU",
+  Hobart: "AU",
+  Perth: "AU",
+  Darwin: "AU",
+  Currie: "AU",
+  Broken_Hill: "AU",
+  Lindeman: "AU",
+  // IN
+  Kolkata: "IN",
+  Calcutta: "IN",
+  // DE
+  Berlin: "DE",
+  Busingen: "DE",
+  // FR
+  Paris: "FR",
+};
+
+// Helper to derive a country/region code from browser timezone.
+// Falls back to "US" when unavailable.
+function getBrowserCountry(): string {
+  try {
+    if (typeof Intl !== 'undefined') {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+      const segments = tz.split('/');
+      const city = segments[segments.length - 1];
+      const mappedCity = TIMEZONE_CITY_TO_COUNTRY[city];
+      if (mappedCity) return mappedCity;
+
+      // Also try the full zone string if present in map (less common)
+      const mappedZone = TIMEZONE_CITY_TO_COUNTRY[tz as keyof typeof TIMEZONE_CITY_TO_COUNTRY];
+      if (mappedZone) return mappedZone;
+    }
+  } catch (err) {
+    console.warn('Failed to derive browser country', err);
+  }
+  return 'US';
+}
+
 export function CookingView({ recipe, onBack }: CookingViewProps) {
   const [checkedIngredients, setCheckedIngredients] = useState<Set<number>>(new Set());
   const [showCopied, setShowCopied] = useState(false);
   const [showIngredients, setShowIngredients] = useState(false);
+  
+  const [shoppingList, setShoppingList] = useState<ShoppingItem[]>([]);
+  const [loadingShopping, setLoadingShopping] = useState(false);
+  // Derive once to avoid double-calling /shopping (no navigator.language fallback)
+  const [countryCode] = useState<string>(() => getBrowserCountry());
+  const fetchedShoppingKey = useRef<string | null>(null);
+
+  // Fetch shopping links when recipe or country changes (but avoid duplicate fetches)
+  useEffect(() => {
+    if (!recipe.id || !countryCode) return;
+
+    const key = `${recipe.id}|${countryCode}`;
+    if (fetchedShoppingKey.current === key) return;
+
+    fetchedShoppingKey.current = key;
+      setLoadingShopping(true);
+      setShoppingList([]); // Clear old list
+      
+      api.getShoppingLinks(recipe.id, countryCode)
+        .then(res => setShoppingList(res.items))
+        .catch(err => {
+          console.error("Failed to fetch shopping links:", err);
+          fetchedShoppingKey.current = null; // Allow retry on error
+        })
+        .finally(() => setLoadingShopping(false));
+  }, [recipe.id, countryCode]);
 
   // Augment steps with Intro and Outro (no tips for these)
   const augmentedSteps = useMemo(() => {
@@ -229,6 +344,8 @@ export function CookingView({ recipe, onBack }: CookingViewProps) {
                         ingredients={recipe.ingredients}
                         checkedItems={checkedIngredients}
                         onToggleItem={toggleIngredient}
+                        shoppingList={shoppingList}
+                        loadingShopping={loadingShopping}
                       />
                     </div>
                   </div>
@@ -272,6 +389,8 @@ export function CookingView({ recipe, onBack }: CookingViewProps) {
                 ingredients={recipe.ingredients}
                 checkedItems={checkedIngredients}
                 onToggleItem={toggleIngredient}
+                shoppingList={shoppingList}
+                loadingShopping={loadingShopping}
               />
             </div>
           </div>

@@ -9,13 +9,17 @@ from app.schemas.recipe import (
     RecipeProcessRequest,
     RecipeSaveRequest,
     IngredientSchema,
-    StepSchema
+    StepSchema,
+    ShoppingListResponse,
+    ShoppingItem,
+    ProductLink
 )
 from app.services.recipe_service import RecipeService
 from app.services.scraper_service import ScraperService, get_scraper_service
 from app.services.llm_service import LLMService, get_llm_service
 from app.services.user_settings_service import UserSettingsService
 from app.services.auth_service import AuthService
+from app.services.shopping_service import ShoppingService, get_shopping_service
 from app.models.user import User
 from app.services.tts_service import get_tts_service
 
@@ -179,12 +183,15 @@ async def process_recipe(
 @router.get("", response_model=RecipeListResponse)
 async def get_recipes(
     skip: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=100),
+    limit: int = Query(10, ge=1, le=100),
     anonymous_user_id: Optional[str] = Query(None, description="Anonymous user ID from localStorage"),
     db: AsyncSession = Depends(get_db),
     user: Optional[User] = Depends(get_optional_user)
 ):
-    """Get recipes for the current user."""
+    """Get recipes for the current user. Max limit per request is 10."""
+    if limit > 10:
+        raise HTTPException(status_code=400, detail="Limit cannot exceed 10")
+
     recipe_service = RecipeService(db)
     
     # Get user-specific recipes
@@ -238,6 +245,46 @@ async def get_recipe(
     if not recipe:
         raise HTTPException(status_code=404, detail="Recipe not found")
     return recipe
+
+
+@router.get("/{recipe_id}/shopping", response_model=ShoppingListResponse)
+async def get_shopping_links(
+    recipe_id: str,
+    country: str = Query("US", min_length=2),
+    db: AsyncSession = Depends(get_db),
+    shopping_service: ShoppingService = Depends(get_shopping_service)
+):
+    """Get shopping links for recipe ingredients."""
+    print(f"[DEBUG] Shopping request for recipe {recipe_id}, country={country}")
+    recipe_service = RecipeService(db)
+    recipe = await recipe_service.get_recipe(recipe_id)
+    if not recipe:
+        raise HTTPException(status_code=404, detail="Recipe not found")
+    
+    # Collect ingredients
+    ingredients = []
+    for ing in recipe.ingredients:
+        if isinstance(ing, dict):
+            name = ing.get("name")
+            if name:
+                ingredients.append(name)
+        elif isinstance(ing, str):
+             ingredients.append(ing)
+    
+    print(f"[DEBUG] Found {len(ingredients)} ingredients to generate links for")
+
+    # Generate product links for each ingredient
+    # No external API calls - just generates direct links to grocery sites
+    items = []
+    for name in ingredients:
+        products = await shopping_service.find_products(name, country)
+        items.append(ShoppingItem(
+            ingredient_name=name,
+            products=[ProductLink(**p) for p in products]
+        ))
+    
+    print(f"[DEBUG] Generated shopping links for {len(items)} items")
+    return ShoppingListResponse(items=items)
 
 
 @router.delete("/{recipe_id}")

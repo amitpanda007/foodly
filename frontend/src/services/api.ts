@@ -5,6 +5,7 @@ import {
   VoiceListResponse,
   UserVoiceResponse,
   RecipeSaveRequest,
+  ShoppingListResponse,
 } from '../types';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -142,6 +143,18 @@ export const api = {
       body: JSON.stringify(request),
     });
     return handleResponse<Recipe>(response);
+  },
+
+  async getShoppingLinks(recipeId: string, country?: string): Promise<ShoppingListResponse> {
+    const params = new URLSearchParams();
+    if (country) params.append('country', country);
+    
+    const url = params.toString()
+      ? `${API_URL}/api/recipes/${recipeId}/shopping?${params}`
+      : `${API_URL}/api/recipes/${recipeId}/shopping`;
+      
+    const response = await fetch(url);
+    return handleResponse<ShoppingListResponse>(response);
   },
 
   async healthCheck(): Promise<{ status: string }> {

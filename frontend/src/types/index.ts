@@ -105,3 +105,18 @@ export interface RecipeSaveRequest {
   recipe_id: string;
 }
 
+export interface ProductLink {
+  title?: string | null;
+  link?: string | null;
+  source?: string | null;
+  price?: string | null;
+}
+
+export interface ShoppingItem {
+  ingredient_name: string;
+  products: ProductLink[];
+}
+
+export interface ShoppingListResponse {
+  items: ShoppingItem[];
+}
