@@ -1,5 +1,3 @@
-version: '3.8'
-
 # Development-only compose file
 # Use: docker-compose -f docker-compose.dev.yml up -d
 

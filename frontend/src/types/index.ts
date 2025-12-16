@@ -10,6 +10,7 @@ export interface Step {
   instruction: string;
   duration?: string | null;
   tips?: string | null;
+  ingredients?: string[] | null;
   audio_url?: string | null;
 }
 

@@ -16,6 +16,7 @@ class StepSchema(BaseModel):
     instruction: str
     duration: Optional[str] = None
     tips: Optional[str] = None
+    ingredients: Optional[List[str]] = []
     audio_url: Optional[str] = None
 
 

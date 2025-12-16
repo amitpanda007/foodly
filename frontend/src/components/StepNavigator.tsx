@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   ChevronLeft,
   ChevronRight,
@@ -13,7 +13,8 @@ import {
   X,
   AlertCircle,
   Clock,
-  Maximize2
+  Maximize2,
+  List
 } from 'lucide-react';
 import { Step } from '../types';
 import { useSpeechRecognition, useSpeechSynthesis, VoiceCommand } from '../hooks/useSpeech';
@@ -36,14 +37,20 @@ export function StepNavigator({ steps, ingredientsAudioUrl }: StepNavigatorProps
   });
   const [isPlaying, setIsPlaying] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showAllSteps, setShowAllSteps] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [lastHeardCommand, setLastHeardCommand] = useState<string | null>(null);
   
+  // Refs to track playback state
+  const lastPlayedStepRef = useRef<number | null>(null);
+  const ignorePauseRef = useRef(false);
+
   const {
-    isSpeaking,
     isSupported: ttsSupported,
     speak,
     stop: stopSpeaking,
+    pause,
+    resume
   } = useSpeechSynthesis();
 
   const {
@@ -85,6 +92,10 @@ export function StepNavigator({ steps, ingredientsAudioUrl }: StepNavigatorProps
     if (ingredientsAudioUrl) {
        setIsPlaying(false);
        stopSpeaking();
+       // Reset ref so we don't try to resume ingredients as a step
+       lastPlayedStepRef.current = null;
+       // Flag to prevent the useEffect from pausing this new playback immediately
+       ignorePauseRef.current = true;
        // We pass a placeholder text because the audio URL takes precedence in our tts service wrapper usually
        // or if text is fallback. The prompt says "play the audio which lists out the ingredients".
        speak("Here are the ingredients.", undefined, ingredientsAudioUrl);
@@ -92,6 +103,23 @@ export function StepNavigator({ steps, ingredientsAudioUrl }: StepNavigatorProps
        speak("Sorry, I don't have audio for the ingredients list.");
     }
   }, [ingredientsAudioUrl, speak, stopSpeaking]);
+
+  const playStepAtIndex = useCallback((index: number) => {
+    const step = steps[index];
+    if (step) {
+      const displayNumber = index + 1;
+      let text = `Step ${displayNumber}. ${step.instruction}`;
+      if (step.duration) text += `. Duration: ${step.duration}.`;
+      if (step.tips) text += `. Pro tip: ${step.tips}.`;
+      
+      stopSpeaking();
+      setIsPlaying(false);
+      // Reset ref so main player doesn't think we are midway through a step
+      lastPlayedStepRef.current = null;
+      ignorePauseRef.current = true;
+      speak(text, undefined, step.audio_url);
+    }
+  }, [steps, speak, stopSpeaking]);
 
   // Voice Commands
   const voiceCommands: VoiceCommand[] = useMemo(() => [
@@ -149,23 +177,39 @@ export function StepNavigator({ steps, ingredientsAudioUrl }: StepNavigatorProps
   // Handle Auto-Play Sequence
   useEffect(() => {
     if (isPlaying && ttsSupported) {
-      // Read current step
-      readCurrentStep(() => {
-        // When done reading
-        if (autoAdvance && currentStep < steps.length - 1) {
-          // Wait a bit then advance
-          setTimeout(() => {
-            if (isPlaying) { // Check if still playing
-               goToNext();
-            }
-          }, 3000); // 3s pause
-        } else {
-          setIsPlaying(false); // Stop if end reached or auto-advance off
-        }
-      });
-    } else if (!isPlaying && isSpeaking) {
-       // If paused/stopped manually, stop speech
-       stopSpeaking();
+      // Check if we are resuming the same step
+      if (lastPlayedStepRef.current === currentStep) {
+        resume();
+      } else {
+        // Start fresh
+        lastPlayedStepRef.current = currentStep;
+        readCurrentStep(() => {
+          // When done reading
+          if (autoAdvance && currentStep < steps.length - 1) {
+            // Wait a bit then advance
+            setTimeout(() => {
+              if (isPlaying) { // Check if still playing
+                 goToNext();
+              }
+            }, 3000); // 3s pause
+          } else {
+            setIsPlaying(false); // Stop if end reached or auto-advance off
+            lastPlayedStepRef.current = null; // Reset
+          }
+        });
+      }
+    } else if (!isPlaying) {
+       if (ignorePauseRef.current) {
+          ignorePauseRef.current = false;
+          // Don't stop or pause, as we just started something else (ingredients or specific step view)
+       } else if (lastPlayedStepRef.current === currentStep) {
+          // If we paused on the current step, just pause
+          pause();
+       } else {
+          // Otherwise stop completely
+          stopSpeaking();
+          lastPlayedStepRef.current = null;
+       }
     }
   }, [currentStep, isPlaying, autoAdvance, ttsSupported]); // Depend on currentStep to trigger next loop
 
@@ -215,6 +259,14 @@ export function StepNavigator({ steps, ingredientsAudioUrl }: StepNavigatorProps
             style={{ width: `${progress}%` }}
           />
         </div>
+        
+        <button 
+          onClick={() => setShowAllSteps(true)}
+          className="mt-3 w-full py-2 text-xs font-semibold uppercase tracking-wider text-sage-600 dark:text-sage-400 hover:bg-sage-50 dark:hover:bg-sage-900/20 rounded-lg transition-colors flex items-center justify-center gap-2"
+        >
+          <List className="w-4 h-4" />
+          View All Steps
+        </button>
       </div>
 
       {/* Main Step Card */}
@@ -250,6 +302,24 @@ export function StepNavigator({ steps, ingredientsAudioUrl }: StepNavigatorProps
                 {currentStepData.instruction}
               </p>
               
+              {currentStepData.ingredients && currentStepData.ingredients.length > 0 && (
+                <div className="mt-6 mb-2">
+                   <p className="text-xs font-bold uppercase tracking-wider text-sage-600 dark:text-sage-400 mb-3 flex items-center gap-2">
+                      <span className="text-base">🥗</span> Ingredients for this step
+                   </p>
+                   <div className="flex flex-wrap gap-2">
+                      {currentStepData.ingredients.map((ing, i) => (
+                         <span 
+                            key={i} 
+                            className="inline-flex items-center px-3 py-1.5 rounded-lg bg-sage-50 dark:bg-sage-900/20 border border-sage-100 dark:border-sage-800 text-sm font-medium text-sage-800 dark:text-sage-200"
+                         >
+                            {ing}
+                         </span>
+                      ))}
+                   </div>
+                </div>
+              )}
+
               {currentStepData.tips && (
                 <div className="mt-4 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-900/30 rounded-xl p-4">
                   <div className="flex gap-3">
@@ -334,7 +404,7 @@ export function StepNavigator({ steps, ingredientsAudioUrl }: StepNavigatorProps
           {wakeLockSupported && (
             <button
               onClick={toggleWakeLock}
-              className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+              className={`w-10 h-10 rounded-full flex items-center justify-center transition-all lg:hidden ${
                 wakeLockActive
                   ? 'text-amber-400'
                   : 'text-white/40 dark:text-charcoal-400 hover:text-white/70 dark:hover:text-charcoal-600'
@@ -448,29 +518,93 @@ export function StepNavigator({ steps, ingredientsAudioUrl }: StepNavigatorProps
       )}
 
       {/* Step Pills */}
-      <div className="overflow-x-auto -mx-4 px-4 pb-2 scrollbar-hide">
-        <div className="flex gap-1.5 min-w-max">
-          {steps.map((_, index) => (
-            <button
-              key={index}
-              onClick={() => { setCurrentStep(index); setIsPlaying(false); }}
-              className={`flex-shrink-0 w-9 h-9 rounded-full font-semibold text-xs transition-all flex items-center justify-center ${
-                index === currentStep
-                  ? 'bg-sage-500 text-white scale'
-                  : completedSteps.has(index)
-                  ? 'bg-sage-100 text-sage-700 dark:bg-sage-900/30 dark:text-sage-400'
-                  : 'bg-cream-100 dark:bg-charcoal-800 text-charcoal-400 hover:bg-cream-200 dark:hover:bg-charcoal-700'
-              }`}
-            >
-              {completedSteps.has(index) && index !== currentStep ? (
-                <Check className="w-3.5 h-3.5" />
-              ) : (
-                index + 1
-              )}
-            </button>
-          ))}
+      <div className="relative">
+        <div className="overflow-x-auto p-1.5 scrollbar-hide mask-gradient-x">
+          <div className="flex gap-2 min-w-max px-6 justify-start sm:justify-center">
+            {steps.map((_, index) => (
+              <button
+                key={index}
+                onClick={() => { setCurrentStep(index); setIsPlaying(false); }}
+                className={`flex-shrink-0 w-10 h-10 rounded-full font-bold text-sm transition-all duration-300 flex items-center justify-center border-2 ${
+                  index === currentStep
+                    ? 'bg-sage-500 border-sage-500 text-white shadow-lg shadow-sage-500/30 scale-110'
+                    : completedSteps.has(index)
+                    ? 'bg-sage-50 border-sage-200 text-sage-600 dark:bg-sage-900/20 dark:border-sage-800 dark:text-sage-400'
+                    : 'bg-white border-cream-200 text-charcoal-400 hover:border-sage-300 hover:text-sage-500 dark:bg-charcoal-800 dark:border-charcoal-700 dark:hover:border-charcoal-600'
+                }`}
+              >
+                {completedSteps.has(index) && index !== currentStep ? (
+                  <Check className="w-4 h-4" />
+                ) : (
+                  index + 1
+                )}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
+
+      {showAllSteps && (
+        <div className="fixed inset-0 z-[120] bg-white dark:bg-charcoal-900 flex flex-col animate-fade-in">
+           {/* Header */}
+           <div className="flex items-center justify-between p-4 border-b border-cream-200 dark:border-charcoal-800">
+              <h3 className="font-semibold text-lg text-charcoal-900 dark:text-white">All Steps</h3>
+              <button onClick={() => setShowAllSteps(false)} className="p-2 rounded-full hover:bg-cream-100 dark:hover:bg-charcoal-800 text-charcoal-500 transition-colors">
+                 <X className="w-6 h-6" />
+              </button>
+           </div>
+           
+           {/* List */}
+           <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {steps.map((step, index) => (
+                 <div key={index} className={`p-4 rounded-xl border transition-all ${currentStep === index ? 'border-sage-500 ring-1 ring-sage-500 bg-sage-50 dark:bg-sage-900/10' : 'border-cream-200 dark:border-charcoal-700 bg-white dark:bg-charcoal-800'}`}>
+                    <div className="flex gap-4">
+                       <span className={`font-bold text-lg ${currentStep === index ? 'text-sage-600 dark:text-sage-400' : 'text-charcoal-400 dark:text-charcoal-500'}`}>
+                          {index + 1}
+                       </span>
+                       <div className="flex-1">
+                          <p className="text-charcoal-900 dark:text-white leading-relaxed">{step.instruction}</p>
+                          
+                          {step.ingredients && step.ingredients.length > 0 && (
+                             <div className="mt-3 bg-amber-50 dark:bg-amber-900/10 rounded-lg p-3 border border-amber-100 dark:border-amber-900/20">
+                                <p className="text-xs font-bold uppercase tracking-wider text-amber-700 dark:text-amber-500 mb-1.5 flex items-center gap-1.5">
+                                   <span className="text-sm">🥗</span> Step Ingredients
+                                </p>
+                                <div className="flex flex-wrap gap-2">
+                                   {step.ingredients.map((ing, i) => (
+                                      <span key={i} className="inline-flex items-center px-2 py-1 rounded-md bg-white dark:bg-charcoal-800 border border-amber-200 dark:border-amber-900/30 text-xs font-medium text-charcoal-700 dark:text-charcoal-300 shadow-sm">
+                                         {ing}
+                                      </span>
+                                   ))}
+                                </div>
+                             </div>
+                          )}
+
+                          {step.tips && (
+                             <p className="mt-2 text-sm text-indigo-600 dark:text-indigo-400 font-medium">
+                                Pro Tip: <span className="text-charcoal-600 dark:text-charcoal-400 font-normal">{step.tips}</span>
+                             </p>
+                          )}
+                          {step.duration && (
+                             <div className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-amber-600 dark:text-amber-500">
+                                <Clock className="w-3.5 h-3.5" />
+                                {step.duration}
+                             </div>
+                          )}
+                       </div>
+                       <button 
+                          onClick={() => playStepAtIndex(index)}
+                          className="self-start p-3 rounded-full bg-sage-100 text-sage-600 hover:bg-sage-200 dark:bg-sage-900/30 dark:text-sage-400 dark:hover:bg-sage-900/50 transition-colors"
+                          title="Play this step"
+                       >
+                          <Play className="w-5 h-5 fill-current" />
+                       </button>
+                    </div>
+                 </div>
+              ))}
+           </div>
+        </div>
+      )}
 
       {isExpanded && (
         <div className="fixed inset-0 z-[100] bg-white dark:bg-charcoal-900 flex flex-col animate-fade-in">
@@ -488,16 +622,34 @@ export function StepNavigator({ steps, ingredientsAudioUrl }: StepNavigatorProps
           </div>
 
           {/* Content */}
-          <div className="flex-1 overflow-y-auto p-6 flex flex-col justify-center items-center text-center">
-              <p className="text-2xl md:text-4xl font-medium leading-relaxed text-charcoal-900 dark:text-white">
-                 {currentStepData.instruction}
-              </p>
-              {currentStepData.tips && (
-                 <div className="mt-8 bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-xl text-indigo-800 dark:text-indigo-200 max-w-2xl">
-                    <p className="font-bold uppercase text-xs mb-2 opacity-70">Pro Tip</p>
-                    <p className="text-lg">{currentStepData.tips}</p>
-                 </div>
-              )}
+          <div className="flex-1 overflow-y-auto p-6 flex flex-col items-center text-center">
+              <div className="w-full max-w-3xl flex flex-col justify-center min-h-min space-y-8 py-4">
+                  <p className="text-2xl md:text-4xl font-medium leading-relaxed text-charcoal-900 dark:text-white">
+                     {currentStepData.instruction}
+                  </p>
+                  
+                  {currentStepData.ingredients && currentStepData.ingredients.length > 0 && (
+                    <div className="flex flex-col items-center">
+                       <p className="text-xs font-bold uppercase tracking-wider text-sage-600 dark:text-sage-400 mb-3 flex items-center gap-2">
+                          <span className="text-base">🥗</span> Ingredients for this step
+                       </p>
+                       <div className="flex flex-wrap justify-center gap-2">
+                          {currentStepData.ingredients.map((ing, i) => (
+                             <span key={i} className="px-4 py-2 rounded-full bg-sage-50 dark:bg-sage-900/20 text-sage-700 dark:text-sage-300 font-medium border border-sage-100 dark:border-sage-800">
+                                {ing}
+                             </span>
+                          ))}
+                       </div>
+                    </div>
+                  )}
+
+                  {currentStepData.tips && (
+                     <div className="bg-indigo-50 dark:bg-indigo-900/20 p-6 rounded-2xl text-indigo-800 dark:text-indigo-200 border border-indigo-100 dark:border-indigo-900/30">
+                        <p className="font-bold uppercase text-xs mb-3 opacity-70 tracking-widest">Pro Tip</p>
+                        <p className="text-lg md:text-xl font-medium leading-relaxed">{currentStepData.tips}</p>
+                     </div>
+                  )}
+              </div>
           </div>
 
           {/* Controls */}
@@ -538,6 +690,29 @@ export function StepNavigator({ steps, ingredientsAudioUrl }: StepNavigatorProps
                         {isListening ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
                      </button>
                  )}
+
+                 {wakeLockSupported && (
+                    <button
+                      onClick={toggleWakeLock}
+                      className={`p-3 rounded-full lg:hidden ${
+                        wakeLockActive
+                          ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400'
+                          : 'bg-cream-100 dark:bg-charcoal-800 text-charcoal-600 dark:text-charcoal-300'
+                      }`}
+                      title="Keep Screen On"
+                    >
+                      <Smartphone className="w-5 h-5" />
+                    </button>
+                 )}
+
+                 <button
+                    onClick={() => setShowResetConfirm(true)}
+                    className="p-3 rounded-full bg-cream-100 dark:bg-charcoal-800 text-charcoal-600 dark:text-charcoal-300"
+                    title="Restart"
+                 >
+                    <RotateCcw className="w-5 h-5" />
+                 </button>
+
                  <button
                      onClick={() => setShowSettings(true)}
                      className="p-3 rounded-full bg-cream-100 dark:bg-charcoal-800 text-charcoal-600 dark:text-charcoal-300"

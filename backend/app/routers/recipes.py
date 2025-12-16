@@ -127,6 +127,7 @@ async def process_recipe(
                     instruction=step.get("instruction", str(step)),
                     duration=step.get("duration"),
                     tips=step.get("tips"),
+                    ingredients=step.get("ingredients", []),  # Include step ingredients
                     audio_url=step.get("audio_url")  # Include generated audio URL
                 ))
             elif isinstance(step, str):

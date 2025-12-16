@@ -312,7 +312,7 @@ export function CookingView({ recipe, onBack }: CookingViewProps) {
             {/* Desktop layout: steps + ingredients side-by-side */}
             <div className="hidden lg:grid px-6 py-8 grid-cols-3 gap-6">
               <div className="col-span-2">
-                <div className="rounded-2xl bg-white/90 dark:bg-charcoal-900/90 border border-cream-200 dark:border-charcoal-800 shadow-lg shadow-emerald-500/5">
+                <div className="rounded-2xl bg-white/90 dark:bg-charcoal-900/90 border border-cream-200 dark:border-charcoal-800 shadow-lg shadow-emerald-500/5 p-6">
                   <StepNavigator 
                     steps={augmentedSteps} 
                     ingredientsAudioUrl={recipe.ingredients_audio_url}
@@ -346,6 +346,7 @@ export function CookingView({ recipe, onBack }: CookingViewProps) {
                         onToggleItem={toggleIngredient}
                         shoppingList={shoppingList}
                         loadingShopping={loadingShopping}
+                        variant="plain"
                       />
                     </div>
                   </div>
@@ -391,6 +392,7 @@ export function CookingView({ recipe, onBack }: CookingViewProps) {
                 onToggleItem={toggleIngredient}
                 shoppingList={shoppingList}
                 loadingShopping={loadingShopping}
+                variant="plain"
               />
             </div>
           </div>

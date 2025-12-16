@@ -310,10 +310,10 @@ CRITICAL RULE: YOU MUST SPLIT INSTRUCTIONS INTO MANY SMALL STEPS.
 - ❌ BAD: "Preheat oven to 350. Mix dry ingredients in a bowl. Add wet ingredients and stir until combined." (This is 1 step. REJECTED.)
 - ✅ GOOD:
   [
-    {"number": 1, "instruction": "Preheat oven to 350°F."},
-    {"number": 2, "instruction": "In a large bowl, whisk together flour, sugar, and salt."},
-    {"number": 3, "instruction": "Pour in the milk and eggs."},
-    {"number": 4, "instruction": "Stir gently until just combined."}
+    {"number": 1, "instruction": "Preheat oven to 350°F.", "ingredients": []},
+    {"number": 2, "instruction": "In a large bowl, whisk together flour, sugar, and salt.", "ingredients": ["2 cups flour", "1 cup sugar", "1 tsp salt"]},
+    {"number": 3, "instruction": "Pour in the milk and eggs.", "ingredients": ["1 cup milk", "2 eggs"]},
+    {"number": 4, "instruction": "Stir gently until just combined.", "ingredients": []}
   ]
 
 REQUIREMENTS:
@@ -322,11 +322,12 @@ REQUIREMENTS:
 3.  **Expressive Instructions:** Write clear, descriptive instructions. Do not be overly concise. Include helpful details (e.g., "Mix until the batter is smooth and no lumps remain" instead of just "Mix"). Explain WHY an action is taken if the context provides it. **If a step is very short (e.g. "Chop onions"), expand it to be more conversational and guiding (e.g. "Finely chop the onions, being careful to keep the pieces uniform for even cooking.").**
 4.  **Clean Text:** Remove "Step 1", "1.", icons, emojis, or navigation text from the instructions.
 5.  **Ingredients:** Extract all ingredients precisely.
-6.  **Tips:** If the content contains pro-tips, secrets, or advice, include them in the 'tips' field of the relevant step.
-7.  **Intro/Outro:**
+6.  **Tips:** If the content contains pro-tips, secrets, or advice, include them in the 'tips' field of the relevant step. If no specific tip exists, generate a helpful "Pro Tip" related to the technique being used (e.g., "Don't overcrowd the pan to ensure browning").
+7.  **Step Ingredients:** For EACH step, list the specific ingredients (and their amounts if relevant) being used or added in that step in the 'ingredients' array.
+8.  **Intro/Outro:**
     -   **intro_text:** A brief, welcoming 1-2 sentence overview of what we are cooking.
     -   **outro_text:** A friendly concluding sentence (e.g. "Serve hot and enjoy your meal!").
-8.  **Structure:** Follow this JSON schema EXACTLY:
+9.  **Structure:** Follow this JSON schema EXACTLY:
 
 {
     "title": "String",
@@ -341,7 +342,7 @@ REQUIREMENTS:
         {"name": "String", "amount": "String", "unit": "String", "notes": "String"}
     ],
     "steps": [
-        {"number": Integer, "instruction": "String", "duration": "String or null", "tips": "String or null"}
+        {"number": Integer, "instruction": "String", "duration": "String or null", "tips": "String or null", "ingredients": ["String"]}
     ],
     "tags": ["String"]
 }"""
@@ -391,7 +392,8 @@ REMEMBER: Split instructions into as many small, logical steps as possible. Do n
                             "number": i,
                             "instruction": sent,
                             "duration": None,
-                            "tips": None
+                            "tips": None,
+                            "ingredients": []
                         })
                     if len(new_steps) > 1:
                         data["steps"] = new_steps
@@ -462,6 +464,11 @@ REMEMBER: Split instructions into as many small, logical steps as possible. Do n
                             speech_text += f". Duration: {step['duration']}."
                         if step.get('tips'):
                             speech_text += f". Pro tip: {step['tips']}."
+                        if step.get('ingredients') and len(step['ingredients']) > 0:
+                            # Optionally narrate ingredients, but might be too verbose. 
+                            # Let's keep it simple for now or add if requested.
+                            # For now, just keep instruction + tips.
+                            pass
                             
                         try:
                             audio_url = await tts.generate_audio(speech_text, voice=voice)
@@ -495,7 +502,7 @@ REMEMBER: Split instructions into as many small, logical steps as possible. Do n
                 "total_time": None,
                 "servings": None,
                 "ingredients": [],
-                "steps": [{"number": 1, "instruction": truncated_content[:500], "duration": None, "tips": None}],
+                "steps": [{"number": 1, "instruction": truncated_content[:500], "duration": None, "tips": None, "ingredients": []}],
                 "tags": []
             }
         except Exception as e:

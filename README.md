@@ -134,6 +134,31 @@ docker-compose -f docker-compose.dev.yml up -d
 
 #### Option 2: Manual Setup
 
+**Database (PostgreSQL):**
+
+1. Install PostgreSQL 16+ for your OS:
+   - [Windows Installer](https://www.postgresql.org/download/windows/)
+   - [macOS (Postgres.app)](https://postgresapp.com/) or `brew install postgresql@16`
+   - [Linux](https://www.postgresql.org/download/linux/)
+
+2. Start the PostgreSQL service.
+
+3. Create the database and user:
+   ```bash
+   # Open psql terminal (requires adding psql to PATH)
+   psql -U postgres
+   ```
+
+   ```sql
+   -- Inside psql console:
+   CREATE DATABASE foodly_db;
+   CREATE USER foodly WITH ENCRYPTED PASSWORD 'foodly_password';
+   GRANT ALL PRIVILEGES ON DATABASE foodly_db TO foodly;
+   -- Connect to the new database to grant schema permissions if needed
+   \c foodly_db
+   GRANT ALL ON SCHEMA public TO foodly;
+   ```
+
 **Backend:**
 ```bash
 cd backend
@@ -150,7 +175,7 @@ pip install -r requirements.txt
 cp env.example .env
 
 # Run the server
-uvicorn app.main:app --reload --port 8000
+uvicorn app.main:app --reload --port 8001
 ```
 
 **Frontend:**
