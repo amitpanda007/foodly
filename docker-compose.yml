@@ -63,8 +63,7 @@ services:
         VITE_API_URL: ${VITE_API_URL:-http://localhost:8001}
     container_name: foodly-frontend
     ports:
-      - "80:80"
-      - "443:443"
+      - "3000:3000"
     volumes:
       - ./frontend/certs:/etc/nginx/certs:ro
     depends_on:
