@@ -38,6 +38,27 @@ class ScraperService:
                 return parsed.path.split("/shorts/")[1].split("?")[0]
         
         return None
+
+    def normalize_youtube_url(self, url: str) -> Optional[str]:
+        """
+        Normalize YouTube URLs to a canonical, transcribable base URL.
+
+        Supports:
+        - https://www.youtube.com/watch?v=VIDEO_ID&...  -> https://www.youtube.com/watch?v=VIDEO_ID
+        - https://www.youtube.com/shorts/VIDEO_ID?...   -> https://www.youtube.com/shorts/VIDEO_ID
+        - https://youtu.be/VIDEO_ID?...                 -> https://www.youtube.com/watch?v=VIDEO_ID
+        """
+        video_id = self.extract_youtube_id(url)
+        if not video_id:
+            return None
+
+        parsed = urlparse(url)
+        # Preserve shorts format if the incoming URL is a shorts URL
+        if "/shorts/" in parsed.path:
+            return f"https://www.youtube.com/shorts/{video_id}"
+
+        # Default to watch URL (also covers youtu.be, /watch, /embed, /v)
+        return f"https://www.youtube.com/watch?v={video_id}"
     
     def download_youtube_audio(self, url: str) -> Optional[str]:
         """Download YouTube audio to a temp file."""
@@ -71,7 +92,8 @@ class ScraperService:
         """Scrape YouTube video transcript and metadata."""
         from youtube_transcript_api import YouTubeTranscriptApi
         
-        video_id = self.extract_youtube_id(url)
+        canonical_url = self.normalize_youtube_url(url) or url
+        video_id = self.extract_youtube_id(canonical_url)
         if not video_id:
             raise ValueError("Could not extract YouTube video ID from URL")
         
@@ -91,7 +113,7 @@ class ScraperService:
         
         try:
             async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
-                response = await client.get(url, headers=self.headers)
+                response = await client.get(canonical_url, headers=self.headers)
                 soup = BeautifulSoup(response.text, "lxml")
                 
                 title_tag = soup.find("meta", property="og:title")
@@ -109,8 +131,8 @@ class ScraperService:
             print(f"Warning: Could not fetch YouTube metadata: {e}")
         
         if not transcript:
-            print(f"Transcript API failed, attempting audio download for {url}")
-            audio_path = self.download_youtube_audio(url)
+            print(f"Transcript API failed, attempting audio download for {canonical_url}")
+            audio_path = self.download_youtube_audio(canonical_url)
             if audio_path:
                 print(f"Audio downloaded to {audio_path}")
                 transcript = f"[AUDIO_FILE]:{audio_path}"
@@ -248,12 +270,14 @@ class ScraperService:
     async def scrape(self, url: str) -> dict:
         """Main scraping method that routes to appropriate scraper."""
         if self.is_youtube_url(url):
+            canonical_url = self.normalize_youtube_url(url) or url
             content, title, image_url = await self.scrape_youtube(url)
             return {
                 "content": content,
                 "title": title,
                 "image_url": image_url,
-                "source_type": "youtube"
+                "source_type": "youtube",
+                "canonical_url": canonical_url,
             }
         else:
             content, title, image_url = await self.scrape_website(url)

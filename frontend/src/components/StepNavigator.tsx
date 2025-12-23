@@ -284,13 +284,6 @@ export function StepNavigator({ steps, ingredientsAudioUrl }: StepNavigatorProps
                     {currentStepData.duration}
                   </div>
                 )}
-                <button
-                  onClick={() => setIsExpanded(true)}
-                  className="p-2 rounded-lg text-charcoal-400 hover:text-charcoal-600 hover:bg-cream-100 dark:hover:bg-charcoal-800 transition-colors"
-                  title="Expand View"
-                >
-                  <Maximize2 className="w-4 h-4" />
-                </button>
               </div>
             </div>
 
@@ -362,6 +355,14 @@ export function StepNavigator({ steps, ingredientsAudioUrl }: StepNavigatorProps
                 className="w-11 h-11 rounded-xl flex items-center justify-center bg-sage-500 text-white hover:bg-sage-600 disabled:opacity-30 transition-colors"
                >
                 <ChevronRight className="w-5 h-5" />
+               </button>
+
+               <button
+                 onClick={() => setIsExpanded(true)}
+                 className="w-11 h-11 rounded-xl flex items-center justify-center bg-cream-100 hover:bg-cream-200 text-charcoal-600 dark:bg-charcoal-800 dark:text-charcoal-200 dark:hover:bg-charcoal-700 transition-colors"
+                 title="Expand View"
+               >
+                 <Maximize2 className="w-5 h-5" />
                </button>
             </div>
           </div>

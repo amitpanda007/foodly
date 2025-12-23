@@ -66,9 +66,14 @@ async def process_recipe(
     voice_user_id = str(user_id) if user_id else request.anonymous_user_id
     voice_id = await user_settings.get_user_voice(voice_user_id) if voice_user_id else None
     
-    # Check if recipe already exists for this user
+    # Normalize URL for YouTube to avoid issues with query params (playlist/time/feature/etc)
+    normalized_url = request.url
+    if scraper.is_youtube_url(request.url):
+        normalized_url = scraper.normalize_youtube_url(request.url) or request.url
+
+    # Check if recipe already exists for this user (use normalized URL to prevent duplicates)
     existing = await recipe_service.get_recipe_by_url(
-        request.url,
+        normalized_url,
         user_id=user_id,
         anonymous_user_id=anonymous_user_id
     )
@@ -88,7 +93,7 @@ async def process_recipe(
 
     try:
         # Scrape the content
-        scraped_data = await scraper.scrape(request.url)
+        scraped_data = await scraper.scrape(normalized_url)
         
         # Clean content length for debug logging
         content_len = len(scraped_data.get('content', ''))
@@ -135,11 +140,14 @@ async def process_recipe(
         
         # Use scraped title if LLM didn't provide one
         title = parsed_recipe.get("title") or scraped_data.get("title") or "Untitled Recipe"
+
+        # For YouTube, store a canonical URL (strip extra query params, playlists, timestamps, etc.)
+        canonical_source_url = scraped_data.get("canonical_url") or normalized_url
         
         # Create recipe
         recipe_data = RecipeCreate(
             title=title,
-            source_url=request.url,
+            source_url=canonical_source_url,
             source_type=scraped_data["source_type"],
             description=parsed_recipe.get("description"),
             image_url=scraped_data.get("image_url"),
